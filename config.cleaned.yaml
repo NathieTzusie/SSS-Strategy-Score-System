@@ -1,0 +1,78 @@
+edge_concentration:
+  enabled: true
+  largest_win_warning_threshold: 0.35
+  top_10_percent_warning_threshold: 0.7
+  top_5_warning_threshold: 0.6
+filters:
+  date_end: null
+  date_start: null
+  strategy_name: []
+  symbol: []
+input_path:
+- outputs/data_quality/cleaned_trades.csv
+label_quality:
+  cleaned_csv_name: cleaned_trades.csv
+  enabled: true
+  output_dir: outputs/data_quality
+  preserve_original_regime_snapshot_id: true
+  regime_snapshot_normalization:
+    enabled: true
+    format: '{regime}_{YYYYMMDD}'
+    overwrite_existing: false
+    preserve_original_column: original_regime_snapshot_id
+  session_backfill:
+    enabled: true
+    overwrite_existing: false
+    rules:
+      Asia:
+      - 0
+      - 9
+      London:
+      - 7
+      - 16
+      NY:
+      - 12
+      - 21
+      overlap:
+      - 12
+      - 16
+    timezone: UTC
+  structure_state_backfill:
+    enabled: true
+    overwrite_existing: false
+    source_field: regime
+market_opportunity:
+  default_score: 1.0
+  enabled: false
+metric_caps:
+  max_payoff_ratio: 10.0
+  max_profit_factor: 10.0
+min_trades: 30
+monte_carlo:
+  drawdown_threshold_R: 10
+  iterations: 5000
+  method: bootstrap
+  random_seed: 42
+output_dir: outputs
+recent_trade_window: 20
+regime_schema:
+  fill_missing_layered_fields_with: unknown
+  use_layered_regime_fields: true
+review_rules:
+  edge_concentration_requires_review: true
+  losing_streak_review_threshold: 4
+  low_sample_requires_review: true
+  mc_drawdown_probability_review_threshold: 0.25
+score_thresholds:
+  medium_enable: 65
+  strong_enable: 80
+  weak_enable: 50
+score_weights:
+  monte_carlo_stability: 0.25
+  recent_health: 0.15
+  regime_edge: 0.4
+  risk_control: 0.2
+validation:
+  duplicate_trade_id: warning
+  fill_missing_state_with: unknown
+  require_exit_after_entry: true

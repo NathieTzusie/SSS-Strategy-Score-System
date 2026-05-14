@@ -1,6 +1,8 @@
-# Strategy Enable Score System v1.1
+# Strategy Enable Score System v1.1.0
 
 策略质量评估系统 — 判断已存在策略在当前市场环境下是否应开启（强/中/弱/禁用）。
+
+**当前版本：** v1.1.0 Stable ✅ | **测试：** 230/230 | **Baseline：** 0/3/3/6 (delta=0)
 
 ## 快速开始
 
@@ -225,4 +227,56 @@ SSS-Strategy-Score-System/
 
 ## 版本
 
-v1.1 — P0 + P1 完成。Market Opportunity Score 为 placeholder（默认 1.0）。
+v1.1.0 Stable — P0 + P1 + P2-1 至 P2-20 完成。Market Opportunity Score / Classifier 为 BLOCK（orderflow 覆盖不足）。
+
+## 推荐日常运行
+
+### 默认输入
+
+```yaml
+config.yaml → input_path: "outputs/data_quality/cleaned_trades.csv"
+```
+
+不使用 `enriched_trades_full_year.csv` 作为默认评分输入。
+
+### 工作流
+
+```bash
+# A. 运行默认评分（必选）
+PYTHONPATH=src python3 -m strategy_enable_system.main --config config.yaml
+
+# B. 运行 Data Quality Monitor（推荐）
+PYTHONPATH=src python3 -m strategy_enable_system.data_quality_monitor --config config.yaml --output-dir outputs/monitor
+
+# C. 查看报告
+#   - outputs/summary_report.md              ← 评分汇总（先看这个）
+#   - outputs/monitor/data_quality_monitor_report.md  ← 系统健康
+
+# D. 可选：生成 Partial Context Report（辅助复盘）
+PYTHONPATH=src python3 -m strategy_enable_system.context_report --config config.yaml \
+  --input outputs/data_quality/enriched_trades_full_year.csv \
+  --quality-summary outputs/data_quality_full_year/label_quality_summary.csv \
+  --output-dir outputs/context
+```
+
+## 不可用功能
+
+| 功能 | 状态 | 原因 |
+|------|------|------|
+| Automatic Regime Classifier | 🔴 BLOCK | orderflow 14% < 80% |
+| Full Market Opportunity Score | 🔴 BLOCK | orderflow + calendar unavailable |
+
+**不要用不完整 orderflow 数据做自动决策。** Partial Context Report 标注为 INFORMATIONAL ONLY。
+
+## 文档入口
+
+| 文档 | 路径 |
+|------|------|
+| Stable Release Note | `docs/v1_1_stable_release_note.md` |
+| User Acceptance Review | `docs/user_acceptance_review_v1_1.md` |
+| Partial Feature Readiness | `docs/partial_feature_readiness_review.md` |
+| Orderflow Source Decision | `docs/orderflow_source_decision_record.md` |
+| Orderflow Data Source Plan | `docs/orderflow_data_source_plan.md` |
+| RC Validation Report | `outputs/release_candidate/RC_VALIDATION_REPORT.md` |
+| Stable Freeze Checklist | `outputs/release_candidate/STABLE_FREEZE_CHECKLIST.md` |
+| Changelog | `CHANGELOG.md` |

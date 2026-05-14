@@ -17,3 +17,9 @@ outputs/validation_baseline_original/
 outputs/validation_cleaned/
 data/external/
 .DS_Store
+.env
+
+# Data directories (large, potentially sensitive)
+data/external/
+outputs/coinglass_live_full/raw/
+outputs/coinglass_live_small/raw/

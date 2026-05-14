@@ -1,0 +1,73 @@
+strategy_name,regime,field,total_trades,known_count,unknown_count,coverage_rate,readiness_status,dominant_value,dominant_value_share,distribution_json,informational_only
+ATR_ETH_3m,range,session,75,75,0,1.0,PASS,overlap,0.5067,"{""overlap"": 38, ""weekend"": 19, ""Asia"": 11, ""London"": 5, ""NY"": 2}",True
+ATR_ETH_3m,range,structure_state,75,75,0,1.0,PASS,range,1.0,"{""range"": 75}",True
+ATR_ETH_3m,range,volatility_state,75,75,0,1.0,PASS,medium,0.4,"{""medium"": 30, ""low"": 29, ""high"": 16}",True
+ATR_ETH_3m,range,oi_state,75,75,0,1.0,PASS,flat,0.68,"{""flat"": 51, ""rising"": 16, ""falling"": 8}",True
+ATR_ETH_3m,range,funding_state,75,75,0,1.0,PASS,positive,0.84,"{""positive"": 63, ""negative"": 12}",True
+ATR_ETH_3m,range,etf_flow_state,75,75,0,1.0,PASS,neutral,0.3733,"{""neutral"": 28, ""outflow"": 26, ""inflow"": 21}",True
+ATR_ETH_3m,trend_down,session,36,36,0,1.0,PASS,overlap,0.4722,"{""overlap"": 17, ""weekend"": 8, ""Asia"": 6, ""NY"": 4, ""London"": 1}",True
+ATR_ETH_3m,trend_down,structure_state,36,36,0,1.0,PASS,trend_down,1.0,"{""trend_down"": 36}",True
+ATR_ETH_3m,trend_down,volatility_state,36,36,0,1.0,PASS,low,0.4722,"{""low"": 17, ""high"": 14, ""medium"": 5}",True
+ATR_ETH_3m,trend_down,oi_state,36,36,0,1.0,PASS,flat,0.6111,"{""flat"": 22, ""falling"": 11, ""rising"": 3}",True
+ATR_ETH_3m,trend_down,funding_state,36,36,0,1.0,PASS,positive,0.6944,"{""positive"": 25, ""negative"": 10, ""neutral"": 1}",True
+ATR_ETH_3m,trend_down,etf_flow_state,36,36,0,1.0,PASS,neutral,0.4722,"{""neutral"": 17, ""outflow"": 15, ""inflow"": 4}",True
+ATR_ETH_3m,trend_up,session,33,33,0,1.0,PASS,overlap,0.4545,"{""overlap"": 15, ""weekend"": 9, ""London"": 4, ""Asia"": 4, ""NY"": 1}",True
+ATR_ETH_3m,trend_up,structure_state,33,33,0,1.0,PASS,trend_up,1.0,"{""trend_up"": 33}",True
+ATR_ETH_3m,trend_up,volatility_state,33,33,0,1.0,PASS,high,0.5152,"{""high"": 17, ""medium"": 10, ""low"": 6}",True
+ATR_ETH_3m,trend_up,oi_state,33,30,3,0.9091,PASS,flat,0.5152,"{""flat"": 17, ""rising"": 9, ""falling"": 4}",True
+ATR_ETH_3m,trend_up,funding_state,33,30,3,0.9091,PASS,positive,0.9091,"{""positive"": 30}",True
+ATR_ETH_3m,trend_up,etf_flow_state,33,33,0,1.0,PASS,inflow,0.5455,"{""inflow"": 18, ""neutral"": 10, ""outflow"": 5}",True
+BAW_ETH_5m,range,session,80,80,0,1.0,PASS,overlap,0.2625,"{""overlap"": 21, ""Asia"": 19, ""NY"": 17, ""London"": 12, ""weekend"": 11}",True
+BAW_ETH_5m,range,structure_state,80,80,0,1.0,PASS,range,1.0,"{""range"": 80}",True
+BAW_ETH_5m,range,volatility_state,80,80,0,1.0,PASS,medium,0.3375,"{""medium"": 27, ""low"": 27, ""high"": 26}",True
+BAW_ETH_5m,range,oi_state,80,77,3,0.9625,PASS,flat,0.5625,"{""flat"": 45, ""rising"": 19, ""falling"": 13}",True
+BAW_ETH_5m,range,funding_state,80,77,3,0.9625,PASS,positive,0.7625,"{""positive"": 61, ""negative"": 16}",True
+BAW_ETH_5m,range,etf_flow_state,80,80,0,1.0,PASS,neutral,0.4125,"{""neutral"": 33, ""outflow"": 24, ""inflow"": 23}",True
+BAW_ETH_5m,trend_down,session,56,56,0,1.0,PASS,Asia,0.2857,"{""Asia"": 16, ""overlap"": 15, ""weekend"": 14, ""NY"": 6, ""London"": 5}",True
+BAW_ETH_5m,trend_down,structure_state,56,56,0,1.0,PASS,trend_down,1.0,"{""trend_down"": 56}",True
+BAW_ETH_5m,trend_down,volatility_state,56,56,0,1.0,PASS,low,0.4286,"{""low"": 24, ""high"": 17, ""medium"": 15}",True
+BAW_ETH_5m,trend_down,oi_state,56,56,0,1.0,PASS,flat,0.5357,"{""flat"": 30, ""falling"": 14, ""rising"": 12}",True
+BAW_ETH_5m,trend_down,funding_state,56,56,0,1.0,PASS,positive,0.6786,"{""positive"": 38, ""negative"": 17, ""neutral"": 1}",True
+BAW_ETH_5m,trend_down,etf_flow_state,56,56,0,1.0,PASS,outflow,0.4464,"{""outflow"": 25, ""neutral"": 20, ""inflow"": 11}",True
+BAW_ETH_5m,trend_up,session,69,69,0,1.0,PASS,Asia,0.2899,"{""Asia"": 20, ""weekend"": 20, ""NY"": 12, ""overlap"": 11, ""London"": 6}",True
+BAW_ETH_5m,trend_up,structure_state,69,69,0,1.0,PASS,trend_up,1.0,"{""trend_up"": 69}",True
+BAW_ETH_5m,trend_up,volatility_state,69,69,0,1.0,PASS,high,0.5072,"{""high"": 35, ""low"": 21, ""medium"": 13}",True
+BAW_ETH_5m,trend_up,oi_state,69,61,8,0.8841,PASS,flat,0.5362,"{""flat"": 37, ""rising"": 13, ""falling"": 11}",True
+BAW_ETH_5m,trend_up,funding_state,69,62,7,0.8986,PASS,positive,0.8551,"{""positive"": 59, ""negative"": 3}",True
+BAW_ETH_5m,trend_up,etf_flow_state,69,69,0,1.0,PASS,inflow,0.7101,"{""inflow"": 49, ""neutral"": 17, ""outflow"": 3}",True
+BTP_BTC_1H,range,session,20,20,0,1.0,PASS,Asia,0.25,"{""Asia"": 5, ""London"": 4, ""overlap"": 4, ""NY"": 4, ""weekend"": 3}",True
+BTP_BTC_1H,range,structure_state,20,20,0,1.0,PASS,range,1.0,"{""range"": 20}",True
+BTP_BTC_1H,range,volatility_state,20,20,0,1.0,PASS,high,0.5,"{""high"": 10, ""medium"": 6, ""low"": 4}",True
+BTP_BTC_1H,range,oi_state,20,20,0,1.0,PASS,flat,0.65,"{""flat"": 13, ""rising"": 4, ""falling"": 3}",True
+BTP_BTC_1H,range,funding_state,20,20,0,1.0,PASS,positive,0.85,"{""positive"": 17, ""negative"": 3}",True
+BTP_BTC_1H,range,etf_flow_state,20,20,0,1.0,PASS,outflow,0.5,"{""outflow"": 10, ""inflow"": 9, ""neutral"": 1}",True
+BTP_BTC_1H,trend_down,session,18,18,0,1.0,PASS,NY,0.3889,"{""NY"": 7, ""weekend"": 4, ""London"": 4, ""Asia"": 2, ""overlap"": 1}",True
+BTP_BTC_1H,trend_down,structure_state,18,18,0,1.0,PASS,trend_down,1.0,"{""trend_down"": 18}",True
+BTP_BTC_1H,trend_down,volatility_state,18,18,0,1.0,PASS,low,0.4444,"{""low"": 8, ""high"": 6, ""medium"": 4}",True
+BTP_BTC_1H,trend_down,oi_state,18,18,0,1.0,PASS,flat,0.7778,"{""flat"": 14, ""rising"": 3, ""falling"": 1}",True
+BTP_BTC_1H,trend_down,funding_state,18,18,0,1.0,PASS,positive,0.7222,"{""positive"": 13, ""negative"": 5}",True
+BTP_BTC_1H,trend_down,etf_flow_state,18,18,0,1.0,PASS,outflow,0.5,"{""outflow"": 9, ""neutral"": 5, ""inflow"": 4}",True
+BTP_BTC_1H,trend_up,session,7,7,0,1.0,PASS,weekend,0.2857,"{""weekend"": 2, ""Asia"": 2, ""overlap"": 1, ""London"": 1, ""NY"": 1}",True
+BTP_BTC_1H,trend_up,structure_state,7,7,0,1.0,PASS,trend_up,1.0,"{""trend_up"": 7}",True
+BTP_BTC_1H,trend_up,volatility_state,7,7,0,1.0,PASS,high,0.5714,"{""high"": 4, ""low"": 2, ""medium"": 1}",True
+BTP_BTC_1H,trend_up,oi_state,7,7,0,1.0,PASS,flat,0.5714,"{""flat"": 4, ""falling"": 3}",True
+BTP_BTC_1H,trend_up,funding_state,7,7,0,1.0,PASS,positive,0.7143,"{""positive"": 5, ""neutral"": 1, ""negative"": 1}",True
+BTP_BTC_1H,trend_up,etf_flow_state,7,7,0,1.0,PASS,inflow,0.5714,"{""inflow"": 4, ""outflow"": 2, ""neutral"": 1}",True
+BTP_ETH_30m,range,session,49,49,0,1.0,PASS,weekend,0.2857,"{""weekend"": 14, ""Asia"": 11, ""overlap"": 11, ""London"": 7, ""NY"": 6}",True
+BTP_ETH_30m,range,structure_state,49,49,0,1.0,PASS,range,1.0,"{""range"": 49}",True
+BTP_ETH_30m,range,volatility_state,49,49,0,1.0,PASS,low,0.4694,"{""low"": 23, ""high"": 13, ""medium"": 13}",True
+BTP_ETH_30m,range,oi_state,49,49,0,1.0,PASS,flat,0.7347,"{""flat"": 36, ""rising"": 8, ""falling"": 5}",True
+BTP_ETH_30m,range,funding_state,49,49,0,1.0,PASS,positive,0.8163,"{""positive"": 40, ""negative"": 9}",True
+BTP_ETH_30m,range,etf_flow_state,49,49,0,1.0,PASS,neutral,0.3673,"{""neutral"": 18, ""inflow"": 16, ""outflow"": 15}",True
+BTP_ETH_30m,trend_down,session,44,44,0,1.0,PASS,weekend,0.4091,"{""weekend"": 18, ""NY"": 11, ""London"": 6, ""Asia"": 5, ""overlap"": 4}",True
+BTP_ETH_30m,trend_down,structure_state,44,44,0,1.0,PASS,trend_down,1.0,"{""trend_down"": 44}",True
+BTP_ETH_30m,trend_down,volatility_state,44,44,0,1.0,PASS,low,0.5682,"{""low"": 25, ""high"": 12, ""medium"": 7}",True
+BTP_ETH_30m,trend_down,oi_state,44,44,0,1.0,PASS,flat,0.6591,"{""flat"": 29, ""rising"": 13, ""falling"": 2}",True
+BTP_ETH_30m,trend_down,funding_state,44,44,0,1.0,PASS,positive,0.75,"{""positive"": 33, ""negative"": 11}",True
+BTP_ETH_30m,trend_down,etf_flow_state,44,44,0,1.0,PASS,outflow,0.4091,"{""outflow"": 18, ""neutral"": 16, ""inflow"": 10}",True
+BTP_ETH_30m,trend_up,session,29,29,0,1.0,PASS,Asia,0.3793,"{""Asia"": 11, ""London"": 6, ""overlap"": 5, ""weekend"": 5, ""NY"": 2}",True
+BTP_ETH_30m,trend_up,structure_state,29,29,0,1.0,PASS,trend_up,1.0,"{""trend_up"": 29}",True
+BTP_ETH_30m,trend_up,volatility_state,29,29,0,1.0,PASS,high,0.5172,"{""high"": 15, ""medium"": 11, ""low"": 3}",True
+BTP_ETH_30m,trend_up,oi_state,29,29,0,1.0,PASS,flat,0.6207,"{""flat"": 18, ""falling"": 8, ""rising"": 3}",True
+BTP_ETH_30m,trend_up,funding_state,29,29,0,1.0,PASS,positive,0.8621,"{""positive"": 25, ""negative"": 4}",True
+BTP_ETH_30m,trend_up,etf_flow_state,29,29,0,1.0,PASS,inflow,0.8276,"{""inflow"": 24, ""neutral"": 3, ""outflow"": 2}",True

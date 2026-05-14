@@ -121,6 +121,87 @@ metric_caps.max_profit_factor: 10.0
 edge_concentration.largest_win_warning_threshold: 0.35
 ```
 
+## Partial Context Report (P2-14)
+
+只读上下文报告，展示每个 strategy/regime 组合的外部市场环境标签分布（OI、Funding、ETF flow、Session 等）。
+
+> ⚠️ **INFORMATIONAL ONLY** — 不改变 Enable Score / status / 评分逻辑。仅用于人工复盘。
+
+### 运行
+
+```bash
+PYTHONPATH=src python3 -m strategy_enable_system.context_report \
+  --config config.yaml \
+  --input outputs/data_quality/enriched_trades_full_year.csv \
+  --quality-summary outputs/data_quality_full_year/label_quality_summary.csv \
+  --output-dir outputs/context
+```
+
+### 输入
+
+- `outputs/data_quality/enriched_trades_full_year.csv`（P2-12 生成）
+- `outputs/data_quality_full_year/label_quality_summary.csv`（P2-12 生成）
+
+### 输出
+
+| 文件 | 说明 |
+|------|------|
+| `outputs/context/partial_context_summary.csv` | 结构化 summary |
+| `outputs/context/partial_context_report.md` | Markdown 报告 |
+
+### Included / Excluded Fields
+
+| 状态 | 字段 |
+|------|------|
+| ✅ Included | session, structure_state, volatility_state, oi_state, funding_state, etf_flow_state |
+| ❌ Excluded | orderflow_state (86% unknown), macro_state (fallback), coinbase_premium_state (无数据) |
+
+### 限制
+
+- 不改变 config.yaml input_path
+- 不改变 Enable Score / status / scoring
+- 不作为策略开闭依据
+
+## Data Quality Monitor (P2-15)
+
+持续数据质量监控工具，汇总 label_quality、enrichment audit、CoinGlass fetch coverage、partial context readiness、baseline stability，生成统一的监控报告。
+
+### 运行
+
+```bash
+PYTHONPATH=src python3 -m strategy_enable_system.data_quality_monitor \
+  --config config.yaml \
+  --output-dir outputs/monitor
+```
+
+### 输入
+
+| 文件 | 说明 |
+|------|------|
+| `outputs/data_quality_full_year/label_quality_summary.csv` | Label quality summary |
+| `outputs/data_quality/enrichment_audit_report_full_year.md` | Enrichment audit |
+| `outputs/coinglass_live_full/full_year_fetch_report.md` | CoinGlass fetch report |
+| `outputs/context/partial_context_summary.csv` | Partial context summary |
+| `outputs/baseline_cleaned_official/` | Official baseline |
+
+### 输出
+
+| 文件 | 说明 |
+|------|------|
+| `outputs/monitor/data_quality_monitor_summary.csv` | 结构化监控数据 |
+| `outputs/monitor/data_quality_monitor_report.md` | Markdown 监控报告 |
+
+### Feature Gates
+
+| Feature | Status | 说明 |
+|---------|--------|------|
+| Automatic Regime Classifier | BLOCK | orderflow 覆盖不足 |
+| Full Market Opportunity Score | BLOCK | 依赖 orderflow + calendar |
+| Partial Context Report | PASS | Included fields READY |
+| Data Quality Monitor | PASS | 本工具 |
+
+> ⚠️ Monitor 不改变 config.yaml input_path / Enable Score / status。
+
 ## 项目结构
 
 ```
@@ -128,15 +209,16 @@ SSS-Strategy-Score-System/
   config.yaml
   data/sample_trades.csv
   src/strategy_enable_system/
-    main.py          # CLI 入口
-    config.py        # 配置加载与校验
-    data_loader.py   # CSV 读取与数据标准化
-    metrics.py       # Regime Performance Matrix + Edge Concentration
-    monte_carlo.py   # Bootstrap/Shuffle Monte Carlo 模拟
-    scoring.py       # Strategy Enable Score 计算
-    reporting.py     # CSV + Markdown 报告生成
-    schemas.py       # 字段定义
-    utils.py         # 工具函数（Gini, drawdown, 连亏等）
+    main.py           # CLI 入口
+    config.py         # 配置加载与校验
+    data_loader.py    # CSV 读取与数据标准化
+    metrics.py        # Regime Performance Matrix + Edge Concentration
+    monte_carlo.py    # Bootstrap/Shuffle Monte Carlo 模拟
+    scoring.py        # Strategy Enable Score 计算
+    reporting.py      # CSV + Markdown 报告生成
+    context_report.py # Partial Context Report (P2-14)
+    schemas.py        # 字段定义
+    utils.py          # 工具函数（Gini, drawdown, 连亏等）
   tests/
   outputs/
 ```

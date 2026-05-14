@@ -432,3 +432,237 @@ class TestReportEnhancement:
         
         for col in ["trade_id", "strategy_name", "regime", "pnl_R", "pnl_usd", "direction"]:
             assert df.at[0, col] == original.at[0, col], f"{col} changed"
+
+
+# ============================================================
+# P2-9: CLI Override Tests (--input / --output-dir)
+# ============================================================
+
+class TestLabelQualityCLIOverrides:
+    """Tests for --input and --output-dir CLI parameter overrides added in P2-9."""
+
+    def _make_minimal_csv(self, path: str):
+        """Write a minimal valid trades CSV to path."""
+        import csv
+        rows = [
+            {"trade_id": "T1", "strategy_name": "S1", "regime": "trend_up",
+             "entry_time": "2026-01-05 10:00:00", "exit_time": "2026-01-05 12:00:00",
+             "pnl_R": 1.5, "session": "London", "structure_state": "trend_up",
+             "regime_snapshot_id": "trend_up_20260105", "volatility_state": "low",
+             "orderflow_state": "unknown", "macro_state": "unknown"},
+            {"trade_id": "T2", "strategy_name": "S1", "regime": "trend_up",
+             "entry_time": "2026-01-06 14:00:00", "exit_time": "2026-01-06 16:00:00",
+             "pnl_R": -0.5, "session": "overlap", "structure_state": "trend_up",
+             "regime_snapshot_id": "trend_up_20260106", "volatility_state": "low",
+             "orderflow_state": "unknown", "macro_state": "unknown"},
+        ]
+        with open(path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def test_input_override_reads_custom_csv(self):
+        """--input override: run() should read from the overridden path, not config.input_path."""
+        import yaml
+        from strategy_enable_system.label_quality import run
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write a test CSV to a non-default location
+            custom_csv = os.path.join(tmpdir, "custom_input.csv")
+            self._make_minimal_csv(custom_csv)
+
+            # Create a minimal config that points to a DIFFERENT (non-existent) path
+            config_data = {
+                "input_path": [os.path.join(tmpdir, "nonexistent.csv")],  # would fail without override
+                "output_dir": tmpdir,
+                "min_trades": 1,
+                "recent_trade_window": 5,
+                "monte_carlo": {"iterations": 100, "method": "bootstrap",
+                                "drawdown_threshold_R": 10, "random_seed": 42},
+                "market_opportunity": {"enabled": False, "default_score": 1.0},
+                "edge_concentration": {"enabled": False},
+                "score_weights": {"regime_edge": 0.40, "recent_health": 0.15,
+                                  "monte_carlo_stability": 0.25, "risk_control": 0.20},
+                "score_thresholds": {"strong_enable": 80, "medium_enable": 65, "weak_enable": 50},
+                "metric_caps": {"max_profit_factor": 10.0, "max_payoff_ratio": 10.0},
+                "review_rules": {"losing_streak_review_threshold": 4,
+                                 "mc_drawdown_probability_review_threshold": 0.25,
+                                 "low_sample_requires_review": True,
+                                 "edge_concentration_requires_review": True},
+                "filters": {"symbol": [], "strategy_name": [], "date_start": None, "date_end": None},
+                "validation": {"duplicate_trade_id": "warning",
+                               "require_exit_after_entry": True,
+                               "fill_missing_state_with": "unknown"},
+                "label_quality": {
+                    "enabled": True,
+                    "output_dir": tmpdir,
+                    "cleaned_csv_name": "cleaned_out.csv",
+                    "preserve_original_regime_snapshot_id": True,
+                    "session_backfill": {"enabled": True, "overwrite_existing": False,
+                                        "timezone": "UTC",
+                                        "rules": {"Asia": [0, 9], "London": [7, 16],
+                                                  "NY": [12, 21], "overlap": [12, 16]}},
+                    "structure_state_backfill": {"enabled": True, "overwrite_existing": False,
+                                                "source_field": "regime"},
+                    "regime_snapshot_normalization": {"enabled": False, "overwrite_existing": False,
+                                                     "preserve_original_column": "original_regime_snapshot_id",
+                                                     "format": "{regime}_{YYYYMMDD}"},
+                    "readiness": {"unknown_warning_threshold": 0.20,
+                                  "unknown_blocking_threshold": 0.50,
+                                  "snapshot_unique_ratio_too_high": 0.70,
+                                  "snapshot_unique_ratio_too_low": 0.05,
+                                  "snapshot_min_avg_trades_per_snapshot": 2},
+                },
+            }
+            config_path = os.path.join(tmpdir, "test_config.yaml")
+            with open(config_path, "w") as f:
+                yaml.dump(config_data, f)
+
+            # Should succeed because --input override points to the real CSV
+            run(config_path, input_override=custom_csv)
+
+            # Verify output was created
+            cleaned_out = os.path.join(tmpdir, "cleaned_out.csv")
+            assert os.path.exists(cleaned_out), "Cleaned CSV not created"
+            df_out = pd.read_csv(cleaned_out)
+            assert len(df_out) == 2, f"Expected 2 rows, got {len(df_out)}"
+
+    def test_output_dir_override_writes_to_custom_dir(self):
+        """--output-dir override: run() should write outputs to the overridden directory."""
+        import yaml
+        from strategy_enable_system.label_quality import run
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write a test CSV to the default location
+            default_csv = os.path.join(tmpdir, "default_input.csv")
+            self._make_minimal_csv(default_csv)
+
+            # Custom output directory (different from config)
+            custom_out_dir = os.path.join(tmpdir, "custom_output")
+
+            config_data = {
+                "input_path": [default_csv],
+                "output_dir": tmpdir,
+                "min_trades": 1,
+                "recent_trade_window": 5,
+                "monte_carlo": {"iterations": 100, "method": "bootstrap",
+                                "drawdown_threshold_R": 10, "random_seed": 42},
+                "market_opportunity": {"enabled": False, "default_score": 1.0},
+                "edge_concentration": {"enabled": False},
+                "score_weights": {"regime_edge": 0.40, "recent_health": 0.15,
+                                  "monte_carlo_stability": 0.25, "risk_control": 0.20},
+                "score_thresholds": {"strong_enable": 80, "medium_enable": 65, "weak_enable": 50},
+                "metric_caps": {"max_profit_factor": 10.0, "max_payoff_ratio": 10.0},
+                "review_rules": {"losing_streak_review_threshold": 4,
+                                 "mc_drawdown_probability_review_threshold": 0.25,
+                                 "low_sample_requires_review": True,
+                                 "edge_concentration_requires_review": True},
+                "filters": {"symbol": [], "strategy_name": [], "date_start": None, "date_end": None},
+                "validation": {"duplicate_trade_id": "warning",
+                               "require_exit_after_entry": True,
+                               "fill_missing_state_with": "unknown"},
+                "label_quality": {
+                    "enabled": True,
+                    "output_dir": os.path.join(tmpdir, "default_output"),  # config output (should NOT be used)
+                    "cleaned_csv_name": "cleaned_out.csv",
+                    "preserve_original_regime_snapshot_id": True,
+                    "session_backfill": {"enabled": True, "overwrite_existing": False,
+                                        "timezone": "UTC",
+                                        "rules": {"Asia": [0, 9], "London": [7, 16],
+                                                  "NY": [12, 21], "overlap": [12, 16]}},
+                    "structure_state_backfill": {"enabled": True, "overwrite_existing": False,
+                                                "source_field": "regime"},
+                    "regime_snapshot_normalization": {"enabled": False, "overwrite_existing": False,
+                                                     "preserve_original_column": "original_regime_snapshot_id",
+                                                     "format": "{regime}_{YYYYMMDD}"},
+                    "readiness": {"unknown_warning_threshold": 0.20,
+                                  "unknown_blocking_threshold": 0.50,
+                                  "snapshot_unique_ratio_too_high": 0.70,
+                                  "snapshot_unique_ratio_too_low": 0.05,
+                                  "snapshot_min_avg_trades_per_snapshot": 2},
+                },
+            }
+            config_path = os.path.join(tmpdir, "test_config.yaml")
+            with open(config_path, "w") as f:
+                yaml.dump(config_data, f)
+
+            # Run with custom output dir override
+            run(config_path, output_dir_override=custom_out_dir)
+
+            # Output should be in custom_out_dir, NOT in default_output
+            custom_cleaned = os.path.join(custom_out_dir, "cleaned_out.csv")
+            custom_report = os.path.join(custom_out_dir, "label_quality_report.md")
+            custom_summary = os.path.join(custom_out_dir, "label_quality_summary.csv")
+
+            assert os.path.exists(custom_cleaned), "Cleaned CSV not in custom_out_dir"
+            assert os.path.exists(custom_report), "Report not in custom_out_dir"
+            assert os.path.exists(custom_summary), "Summary not in custom_out_dir"
+
+            # Default output dir should NOT have been created
+            default_out = os.path.join(tmpdir, "default_output")
+            assert not os.path.exists(default_out), "Default output_dir should NOT have been created"
+
+    def test_no_override_uses_config_defaults(self):
+        """When no override is provided, run() behaves exactly as before P2-9 changes."""
+        import yaml
+        from strategy_enable_system.label_quality import run
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            default_csv = os.path.join(tmpdir, "default_input.csv")
+            self._make_minimal_csv(default_csv)
+            default_out = os.path.join(tmpdir, "default_output")
+
+            config_data = {
+                "input_path": [default_csv],
+                "output_dir": tmpdir,
+                "min_trades": 1,
+                "recent_trade_window": 5,
+                "monte_carlo": {"iterations": 100, "method": "bootstrap",
+                                "drawdown_threshold_R": 10, "random_seed": 42},
+                "market_opportunity": {"enabled": False, "default_score": 1.0},
+                "edge_concentration": {"enabled": False},
+                "score_weights": {"regime_edge": 0.40, "recent_health": 0.15,
+                                  "monte_carlo_stability": 0.25, "risk_control": 0.20},
+                "score_thresholds": {"strong_enable": 80, "medium_enable": 65, "weak_enable": 50},
+                "metric_caps": {"max_profit_factor": 10.0, "max_payoff_ratio": 10.0},
+                "review_rules": {"losing_streak_review_threshold": 4,
+                                 "mc_drawdown_probability_review_threshold": 0.25,
+                                 "low_sample_requires_review": True,
+                                 "edge_concentration_requires_review": True},
+                "filters": {"symbol": [], "strategy_name": [], "date_start": None, "date_end": None},
+                "validation": {"duplicate_trade_id": "warning",
+                               "require_exit_after_entry": True,
+                               "fill_missing_state_with": "unknown"},
+                "label_quality": {
+                    "enabled": True,
+                    "output_dir": default_out,  # config output — should be used when no override
+                    "cleaned_csv_name": "cleaned_out.csv",
+                    "preserve_original_regime_snapshot_id": True,
+                    "session_backfill": {"enabled": True, "overwrite_existing": False,
+                                        "timezone": "UTC",
+                                        "rules": {"Asia": [0, 9], "London": [7, 16],
+                                                  "NY": [12, 21], "overlap": [12, 16]}},
+                    "structure_state_backfill": {"enabled": True, "overwrite_existing": False,
+                                                "source_field": "regime"},
+                    "regime_snapshot_normalization": {"enabled": False, "overwrite_existing": False,
+                                                     "preserve_original_column": "original_regime_snapshot_id",
+                                                     "format": "{regime}_{YYYYMMDD}"},
+                    "readiness": {"unknown_warning_threshold": 0.20,
+                                  "unknown_blocking_threshold": 0.50,
+                                  "snapshot_unique_ratio_too_high": 0.70,
+                                  "snapshot_unique_ratio_too_low": 0.05,
+                                  "snapshot_min_avg_trades_per_snapshot": 2},
+                },
+            }
+            config_path = os.path.join(tmpdir, "test_config.yaml")
+            with open(config_path, "w") as f:
+                yaml.dump(config_data, f)
+
+            # No overrides → should use config defaults
+            run(config_path)
+
+            # Output should be in default_out (from config)
+            assert os.path.exists(os.path.join(default_out, "cleaned_out.csv")), \
+                "Cleaned CSV not in config default output_dir"
+            assert os.path.exists(os.path.join(default_out, "label_quality_report.md")), \
+                "Report not in config default output_dir"

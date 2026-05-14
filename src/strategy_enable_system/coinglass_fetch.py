@@ -95,8 +95,15 @@ def _cal_params(config: CoinGlassClientConfig) -> dict:
 
 
 def _endpoint_enabled(ep_def: dict, config: CoinGlassClientConfig) -> bool:
-    """Check if an endpoint is enabled in config."""
+    """Check if an endpoint is enabled in config.
+    
+    If config.fetcher_endpoints is set (non-empty list), only endpoints
+    whose key is in that list are enabled.
+    """
     key = ep_def["key"]
+    # CLI override: explicit endpoint filter
+    if config.fetcher_endpoints:
+        return key in config.fetcher_endpoints
     if key in ("open_interest_aggregated", "funding_oi_weight", "taker_buy_sell_aggregated"):
         enabled = config.futures.endpoints.get(key, True)
         return bool(enabled)
@@ -120,6 +127,8 @@ def _raw_path(config: CoinGlassClientConfig, ep_def: dict, symbol: Optional[str]
     suffix = ep_def["file_suffix"]
     if symbol:
         suffix = suffix.replace("{symbol}", symbol)
+    if config.output_suffix:
+        suffix = f"{suffix}_{config.output_suffix}"
     fname = f"{suffix}_{ts}.json"
     return os.path.join(config.cache_dir, "raw", fname)
 
@@ -128,6 +137,8 @@ def _processed_path(config: CoinGlassClientConfig, ep_def: dict, symbol: Optiona
     suffix = ep_def["file_suffix"]
     if symbol:
         suffix = suffix.replace("{symbol}", symbol)
+    if config.output_suffix:
+        suffix = f"{suffix}_{config.output_suffix}"
     return os.path.join(config.cache_dir, "processed", f"{suffix}.csv")
 
 
@@ -521,6 +532,12 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print plan without fetching")
     parser.add_argument("--mock", action="store_true", help="Generate synthetic data (no network)")
     parser.add_argument("--live", action="store_true", help="Fetch real data from CoinGlass API")
+    parser.add_argument("--symbols", default=None,
+                        help="Comma-separated symbols override (e.g. BTC,ETH)")
+    parser.add_argument("--endpoints", default=None,
+                        help="Comma-separated endpoint keys override (e.g. open_interest_aggregated,funding_oi_weight)")
+    parser.add_argument("--output-suffix", default=None,
+                        help="Suffix appended to output file names (e.g. live_small_batch)")
 
     args = parser.parse_args()
 
@@ -531,6 +548,17 @@ def main():
 
     full_config = load_config(args.config)
     cg_config = full_config.coinglass
+
+    # Apply CLI overrides (minimal intrusion, only what's explicitly provided)
+    if args.symbols is not None:
+        cg_config.symbols = [s.strip() for s in args.symbols.split(",")]
+        logger.info("CLI override symbols: %s", cg_config.symbols)
+    if args.endpoints is not None:
+        cg_config.fetcher_endpoints = [s.strip() for s in args.endpoints.split(",")]
+        logger.info("CLI override endpoints: %s", cg_config.fetcher_endpoints)
+    if args.output_suffix is not None:
+        cg_config.output_suffix = args.output_suffix
+        logger.info("CLI override output_suffix: %s", cg_config.output_suffix)
 
     if args.dry_run:
         run_dry_run(cg_config)

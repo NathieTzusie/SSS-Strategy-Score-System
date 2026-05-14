@@ -1,10 +1,14 @@
-# Strategy Enable Score System v1.1 Configuration
+# Strategy Enable Score System v1.1 — Enriched Regression Config
+# Purpose: P2-9 回归验证，使用 enriched_trades.csv 作为输入
+# 注意：此文件仅用于回归测试，不作为默认配置
+# 生成时间: 2026-05-14
 
 input_path:
-  - "outputs/data_quality/cleaned_trades.csv"
+  - "outputs/data_quality/enriched_trades.csv"
 
-output_dir: "outputs"
+output_dir: "outputs/validation_enriched_mock"
 
+# 以下所有参数与 config.yaml 完全一致，确保回归验证的可重复性
 min_trades: 30
 recent_trade_window: 20
 
@@ -178,70 +182,3 @@ label_enrichment:
     enrich_orderflow_state: true
     enrich_etf_flow_state: true
     enrich_macro_state: true
-
-partial_context:
-  enabled: false
-  input_path: "outputs/data_quality/enriched_trades_full_year.csv"
-  quality_summary_path: "outputs/data_quality_full_year/label_quality_summary.csv"
-  output_dir: "outputs/context"
-  summary_csv_name: "partial_context_summary.csv"
-  report_name: "partial_context_report.md"
-  mode: "partial_context_mode"
-  informational_only: true
-
-  group_by:
-    - strategy_name
-    - regime
-
-  fields:
-    - session
-    - structure_state
-    - volatility_state
-    - oi_state
-    - funding_state
-    - etf_flow_state
-
-  excluded_fields:
-    - orderflow_state
-    - macro_state
-    - coinbase_premium_state
-
-  min_coverage_for_field: 0.80
-  top_n_values: 5
-
-data_quality_monitor:
-  enabled: false
-  output_dir: "outputs/monitor"
-  report_name: "data_quality_monitor_report.md"
-  summary_csv_name: "data_quality_monitor_summary.csv"
-
-  inputs:
-    label_quality_summary: "outputs/data_quality_full_year/label_quality_summary.csv"
-    enrichment_audit_report: "outputs/data_quality/enrichment_audit_report_full_year.md"
-    coinglass_fetch_report: "outputs/coinglass_live_full/full_year_fetch_report.md"
-    partial_context_summary: "outputs/context/partial_context_summary.csv"
-    official_baseline_dir: "outputs/baseline_cleaned_official"
-    current_default_outputs_dir: "outputs"
-
-  thresholds:
-    pass_coverage: 0.80
-    warn_coverage: 0.50
-    max_allowed_enable_score_delta: 0.000001
-    require_context_fields_pass:
-      - session
-      - structure_state
-      - volatility_state
-      - oi_state
-      - funding_state
-      - etf_flow_state
-
-  feature_gates:
-    classifier_requires:
-      orderflow_state_coverage: 0.80
-      macro_true_event_coverage: 0.80
-    market_opportunity_requires:
-      orderflow_state_coverage: 0.80
-      macro_true_event_coverage: 0.80
-      etf_flow_state_coverage: 0.80
-    partial_context_requires:
-      included_field_coverage: 0.80

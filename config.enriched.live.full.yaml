@@ -1,0 +1,40 @@
+# Strategy Enable Score System v1.1 — Enriched Live Full Config (P2-12)
+# 用途: 使用 P2-11 full-year processed 数据做全量 enrichment
+
+input_path:
+  - "outputs/data_quality/cleaned_trades.csv"
+output_dir: "outputs"
+
+label_enrichment:
+  enabled: true
+  input_path: "outputs/data_quality/cleaned_trades.csv"
+  output_path: "outputs/data_quality/enriched_trades_full_year.csv"
+  audit_report_path: "outputs/data_quality/enrichment_audit_report_full_year.md"
+  processed_dir: "data/external/coinglass_live_full/processed"
+  preserve_original_columns: true
+  alignment:
+    time_field: "entry_time"
+    prevent_lookahead: true
+    futures_interval: "1h"
+    daily_interval: "1d"
+    max_staleness_hours:
+      futures: 48
+      etf: 96
+      calendar: 48
+  thresholds:
+    oi_change_pct_rising: 0.03
+    oi_change_pct_falling: -0.03
+    funding_positive: 0.0001
+    funding_negative: -0.0001
+    taker_imbalance_bullish: 0.10
+    taker_imbalance_bearish: -0.10
+    etf_flow_inflow_usd: 50000000
+    etf_flow_outflow_usd: -50000000
+    macro_event_window_hours: 12
+    macro_high_importance_level: 3
+  fields:
+    enrich_oi_state: true
+    enrich_funding_state: true
+    enrich_orderflow_state: true
+    enrich_etf_flow_state: true
+    enrich_macro_state: true

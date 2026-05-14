@@ -511,8 +511,14 @@ def validate_required_columns(df: pd.DataFrame, required: List[str]):
         raise ValueError(f"Missing required columns: {missing}")
 
 
-def run(config_path: str):
-    """Main entry point for label quality tool."""
+def run(config_path: str, input_override: str = None, output_dir_override: str = None):
+    """Main entry point for label quality tool.
+    
+    Args:
+        config_path: Path to config YAML file.
+        input_override: Optional path to override config.input_path (single CSV).
+        output_dir_override: Optional path to override config.label_quality.output_dir.
+    """
     logger.info(f"Loading config from {config_path}")
     config = load_config(config_path)
     
@@ -520,6 +526,14 @@ def run(config_path: str):
     if not lq.enabled:
         logger.warning("label_quality.enabled is False. Set to true in config.yaml to run.")
         return
+    
+    # Apply overrides (CLI wins over config)
+    if input_override:
+        logger.info(f"[--input override] Using input: {input_override}")
+        config.input_path = [input_override]
+    if output_dir_override:
+        logger.info(f"[--output-dir override] Using output_dir: {output_dir_override}")
+        lq.output_dir = output_dir_override
     
     # Read original CSV(s)
     dfs = []
@@ -596,8 +610,19 @@ def main():
         default="config.yaml",
         help="Path to config.yaml (default: config.yaml)",
     )
+    parser.add_argument(
+        "--input", "-i",
+        default=None,
+        help="Override config.input_path with a single CSV path (optional)",
+    )
+    parser.add_argument(
+        "--output-dir", "-o",
+        default=None,
+        dest="output_dir",
+        help="Override config.label_quality.output_dir (optional)",
+    )
     args = parser.parse_args()
-    run(args.config)
+    run(args.config, input_override=args.input, output_dir_override=args.output_dir)
 
 
 if __name__ == "__main__":

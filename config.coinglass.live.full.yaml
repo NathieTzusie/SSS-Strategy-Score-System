@@ -1,0 +1,91 @@
+# Strategy Enable Score System v1.1 — Live Full-Year Config (P2-11)
+# 用途: BTC + ETH 全年 CoinGlass 数据抓取，6 endpoints
+# 注意: 此文件仅用于 P2-11 fetch，不用于 enrichment
+# 生成时间: 2026-05-14
+
+# Required by load_config (minimal dummy, not used by fetch)
+input_path:
+  - "outputs/data_quality/cleaned_trades.csv"
+output_dir: "outputs"
+
+coinglass:
+  enabled: true
+  api_key_env: "COINGLASS_API_KEY"
+  base_url: "https://open-api-v4.coinglass.com"
+  cache_dir: "data/external/coinglass_live_full"
+  output_dir: "outputs/coinglass_live_full"
+  user_agent: "strategy-enable-system/1.1"
+  rate_limit_per_minute: 30
+  request_timeout_seconds: 30
+  retry_count: 2
+  retry_backoff_seconds: 2
+
+  symbols:
+    - BTC
+    - ETH
+
+  futures:
+    exchanges:
+      - Binance
+    exchange_list:
+      - Binance
+      - OKX
+      - Bybit
+    interval: "1d"
+    intraday_interval: "4h"
+    limit: 365
+    endpoints:
+      open_interest_aggregated: true
+      funding_oi_weight: true
+      taker_buy_sell_aggregated: true
+
+  etf:
+    endpoints:
+      bitcoin_flow_history: true
+      ethereum_flow_history: true
+
+  calendar:
+    enabled: true
+    language: "en"
+    lookback_days: 15
+    lookahead_days: 15
+
+  fetch:
+    mode: "live"
+    allow_network: true
+    overwrite_raw_cache: false
+    overwrite_processed: true
+
+label_enrichment:
+  enabled: true
+  input_path: "outputs/data_quality/cleaned_trades.csv"
+  output_path: "outputs/data_quality/enriched_trades.csv"
+  audit_report_path: "outputs/data_quality/enrichment_audit_report.md"
+  processed_dir: "data/external/coinglass/processed"
+  preserve_original_columns: true
+  alignment:
+    time_field: "entry_time"
+    prevent_lookahead: true
+    futures_interval: "1h"
+    daily_interval: "1d"
+    max_staleness_hours:
+      futures: 48
+      etf: 96
+      calendar: 48
+  thresholds:
+    oi_change_pct_rising: 0.03
+    oi_change_pct_falling: -0.03
+    funding_positive: 0.0001
+    funding_negative: -0.0001
+    taker_imbalance_bullish: 0.10
+    taker_imbalance_bearish: -0.10
+    etf_flow_inflow_usd: 50000000
+    etf_flow_outflow_usd: -50000000
+    macro_event_window_hours: 12
+    macro_high_importance_level: 3
+  fields:
+    enrich_oi_state: true
+    enrich_funding_state: true
+    enrich_orderflow_state: true
+    enrich_etf_flow_state: true
+    enrich_macro_state: true

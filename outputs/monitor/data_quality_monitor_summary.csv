@@ -1,0 +1,31 @@
+category,item,metric,value,status,reason,recommendation
+enrichment,enrichment_audit_report,exists,true,PASS,,
+enrichment,enriched_trades_full_year_csv,exists,true,PASS,,
+enrichment,enrich_oi_state,filled_count,502,WARN,"filled=502, missing_match=14, after_unknown=14",
+enrichment,enrich_funding_state,filled_count,503,WARN,"filled=503, missing_match=13, after_unknown=13",
+enrichment,enrich_orderflow_state,filled_count,72,BLOCK,"filled=72, missing_match=444, after_unknown=444",
+enrichment,enrich_etf_flow_state,filled_count,516,PASS,"filled=516, missing_match=0, after_unknown=0",
+enrichment,enrich_macro_state,filled_count,516,PASS,"filled=516, missing_match=0, after_unknown=0",
+field_coverage,session,coverage_rate,1.0,PASS,,
+field_coverage,structure_state,coverage_rate,1.0,PASS,,
+field_coverage,volatility_state,coverage_rate,1.0,PASS,,
+field_coverage,oi_state,coverage_rate,0.9729,PASS,,
+field_coverage,funding_state,coverage_rate,0.9748,PASS,,
+field_coverage,etf_flow_state,coverage_rate,1.0,PASS,,
+field_coverage,orderflow_state,coverage_rate,0.1395,BLOCK,Hobbyist taker 4h limit=365 → ~60 days coverage.,Upgrade CoinGlass plan for 1h taker interval or supplement Binance trades stream.
+field_coverage,macro_state,coverage_rate,1.0,DEGRADED,100% filled but 32.8% fallback neutral — no financial calendar.,Need CoinGlass financial_calendar endpoint (requires higher plan).
+field_coverage,coinbase_premium_state,coverage_rate,,WARN,Field not found in label quality summary.,
+coinglass_fetch,fetch_report,exists,true,PASS,,
+coinglass_fetch,oi_coverage,coverage,100% (BTC) / 97% (ETH),PASS,,
+coinglass_fetch,funding_coverage,coverage,100% (BTC) / 97% (ETH),PASS,,
+coinglass_fetch,etf_coverage,coverage,"100% (BTC 2024+, ETH 2024-07+)",PASS,Daily interval — coverage is complete.,
+coinglass_fetch,taker_4h_coverage,coverage,~11-14% of trades (60 days),BLOCK,Hobbyist plan: 4h × 365 = ~60 days. orderflow_state limited to recent 2 months.,
+coinglass_fetch,financial_calendar,coverage,unavailable,BLOCK,401 under Hobbyist plan. macro_state cannot use event_risk labels.,
+partial_context,context_summary,exists,true,PASS,"72 rows, 6 fields",
+partial_context,partial_context_ready,readiness,ready,PASS,All required fields PASS.,Context report is INFORMATIONAL ONLY — fine to generate.
+feature_gate,automatic_regime_classifier,readiness,block,BLOCK,orderflow_state coverage 14% < 80%; macro true event coverage unavailable (financial_calendar 401 under Hobbyist),Upgrade CoinGlass plan or supplement orderflow data source.
+feature_gate,full_market_opportunity_score,readiness,block,BLOCK,orderflow coverage insufficient; macro event coverage unavailable,Requires classifier-level data + calendar + defined score boundary.
+feature_gate,partial_context_report,readiness,pass,PASS,All included fields meet coverage requirements. INFORMATIONAL ONLY.,"Generate context report — informational only, zero risk."
+feature_gate,data_quality_monitor,readiness,pass,PASS,This tool itself. Dependencies may vary.,
+baseline_stability,baseline_comparison,max_enable_score_delta,0.0000000000,PASS,✅ stable | status_changed=0,
+baseline_stability,default_input_path,reminder,outputs/data_quality/cleaned_trades.csv,PASS,config.yaml input_path unchanged.,

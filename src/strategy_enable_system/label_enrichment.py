@@ -149,23 +149,42 @@ def enrich_macro_state(calendar_df: pd.DataFrame, etf_label: Optional[str],
 # ---------------------------------------------------------------------------
 
 def _find_file(proc_dir: str, *patterns: str) -> Optional[str]:
+    """Find a file in proc_dir matching one of the given patterns.
+    
+    Patterns may contain '*' wildcards (glob). Exact matches are checked first.
+    """
+    import fnmatch
+    try:
+        dir_files = os.listdir(proc_dir)
+    except FileNotFoundError:
+        return None
     for p in patterns:
+        # Try exact match first
         path = os.path.join(proc_dir, p)
         if os.path.exists(path):
             return path
+        # Try glob match if pattern contains wildcard
+        if '*' in p or '?' in p:
+            for f in sorted(dir_files):
+                if fnmatch.fnmatch(f, p):
+                    return os.path.join(proc_dir, f)
     return None
 
 
 def load_processed_data(proc_dir: str, cg_symbol: str, config: LabelEnrichmentConfig):
-    """Load all processed CSV files relevant to a symbol."""
+    """Load all processed CSV files relevant to a symbol.
+    
+    Supports wildcard matching via _find_file. Files with optional suffix
+    (e.g., *_live_small_batch.csv) will match the base patterns.
+    """
     results = {}
     cg_lower = cg_symbol.lower()
     cg_upper = cg_symbol.upper()
 
-    # OI
+    # OI — try exact match first, then wildcard with any suffix
     oi = _find_file(proc_dir,
                     f"{cg_upper}_oi_agg.csv", f"{cg_lower}_oi_agg.csv",
-                    f"open_interest_aggregated_{cg_upper}_1d.csv")
+                    f"{cg_upper}_oi_agg_*.csv", f"{cg_lower}_oi_agg_*.csv")
     if oi:
         results["oi"] = pd.read_csv(oi)
         logger.debug("  OI: %s (%d rows)", oi, len(results["oi"]))
@@ -173,7 +192,7 @@ def load_processed_data(proc_dir: str, cg_symbol: str, config: LabelEnrichmentCo
     # Funding
     fund = _find_file(proc_dir,
                       f"{cg_upper}_funding_oiw.csv", f"{cg_lower}_funding_oiw.csv",
-                      f"funding_oi_weight_{cg_upper}_1d.csv")
+                      f"{cg_upper}_funding_oiw_*.csv", f"{cg_lower}_funding_oiw_*.csv")
     if fund:
         results["funding"] = pd.read_csv(fund)
         logger.debug("  Funding: %s (%d rows)", fund, len(results["funding"]))
@@ -181,7 +200,7 @@ def load_processed_data(proc_dir: str, cg_symbol: str, config: LabelEnrichmentCo
     # Taker
     taker = _find_file(proc_dir,
                        f"{cg_upper}_taker_agg.csv", f"{cg_lower}_taker_agg.csv",
-                       f"taker_buy_sell_aggregated_{cg_upper}_1h.csv")
+                       f"{cg_upper}_taker_agg_*.csv", f"{cg_lower}_taker_agg_*.csv")
     if taker:
         results["taker"] = pd.read_csv(taker)
         logger.debug("  Taker: %s (%d rows)", taker, len(results["taker"]))
@@ -189,13 +208,14 @@ def load_processed_data(proc_dir: str, cg_symbol: str, config: LabelEnrichmentCo
     # ETF
     etf = _find_file(proc_dir,
                      f"{cg_lower}_etf_flow.csv", f"{cg_upper}_etf_flow.csv",
-                     f"bitcoin_etf_flow_{cg_upper}_daily.csv" if cg_upper == "BTC" else f"ethereum_etf_flow_{cg_upper}_daily.csv")
+                     f"{cg_lower}_etf_flow_*.csv", f"{cg_upper}_etf_flow_*.csv")
     if etf:
         results["etf"] = pd.read_csv(etf)
         logger.debug("  ETF: %s (%d rows)", etf, len(results["etf"]))
 
     # Calendar (global — load once)
-    cal_path = _find_file(proc_dir, "calendar_economic.csv", "financial_calendar_GLOBAL_daily.csv")
+    cal_path = _find_file(proc_dir,
+                          "calendar_economic.csv", "calendar_economic_*.csv")
     if cal_path and "calendar" not in results:
         results["calendar"] = pd.read_csv(cal_path)
         logger.debug("  Calendar: %s (%d rows)", cal_path, len(results["calendar"]))

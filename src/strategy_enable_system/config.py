@@ -181,6 +181,8 @@ class CoinGlassClientConfig:
     retry_count: int = 2
     retry_backoff_seconds: float = 2.0
     symbols: List[str] = field(default_factory=lambda: ["BTC", "ETH"])
+    fetcher_endpoints: Optional[List[str]] = None  # CLI override: only fetch these endpoints
+    output_suffix: str = ""  # CLI override: appended to output paths
     futures: CoinGlassFuturesConfig = field(default_factory=CoinGlassFuturesConfig)
     etf: CoinGlassETFConfig = field(default_factory=CoinGlassETFConfig)
     calendar: CoinGlassCalendarConfig = field(default_factory=CoinGlassCalendarConfig)
@@ -233,6 +235,81 @@ class LabelEnrichmentConfig:
 
 
 @dataclass
+class PartialContextConfig:
+    """P2-14: Partial Context Report configuration."""
+    enabled: bool = False
+    input_path: str = "outputs/data_quality/enriched_trades_full_year.csv"
+    quality_summary_path: str = "outputs/data_quality_full_year/label_quality_summary.csv"
+    output_dir: str = "outputs/context"
+    summary_csv_name: str = "partial_context_summary.csv"
+    report_name: str = "partial_context_report.md"
+    mode: str = "partial_context_mode"
+    informational_only: bool = True
+    group_by: List[str] = field(default_factory=lambda: ["strategy_name", "regime"])
+    fields: List[str] = field(default_factory=lambda: [
+        "session", "structure_state", "volatility_state",
+        "oi_state", "funding_state", "etf_flow_state",
+    ])
+    excluded_fields: List[str] = field(default_factory=lambda: [
+        "orderflow_state", "macro_state", "coinbase_premium_state",
+    ])
+    min_coverage_for_field: float = 0.80
+    top_n_values: int = 5
+
+
+@dataclass
+class MonitorInputsConfig:
+    """P2-15: Data Quality Monitor input paths."""
+    label_quality_summary: str = "outputs/data_quality_full_year/label_quality_summary.csv"
+    enrichment_audit_report: str = "outputs/data_quality/enrichment_audit_report_full_year.md"
+    coinglass_fetch_report: str = "outputs/coinglass_live_full/full_year_fetch_report.md"
+    partial_context_summary: str = "outputs/context/partial_context_summary.csv"
+    official_baseline_dir: str = "outputs/baseline_cleaned_official"
+    current_default_outputs_dir: str = "outputs"
+
+
+@dataclass
+class MonitorThresholdsConfig:
+    """P2-15: Monitor thresholds."""
+    pass_coverage: float = 0.80
+    warn_coverage: float = 0.50
+    max_allowed_enable_score_delta: float = 0.000001
+    require_context_fields_pass: List[str] = field(default_factory=lambda: [
+        "session", "structure_state", "volatility_state",
+        "oi_state", "funding_state", "etf_flow_state",
+    ])
+
+
+@dataclass
+class FeatureGatesConfig:
+    """P2-15: Feature gate requirements."""
+    classifier_requires: dict = field(default_factory=lambda: {
+        "orderflow_state_coverage": 0.80,
+        "macro_true_event_coverage": 0.80,
+    })
+    market_opportunity_requires: dict = field(default_factory=lambda: {
+        "orderflow_state_coverage": 0.80,
+        "macro_true_event_coverage": 0.80,
+        "etf_flow_state_coverage": 0.80,
+    })
+    partial_context_requires: dict = field(default_factory=lambda: {
+        "included_field_coverage": 0.80,
+    })
+
+
+@dataclass
+class DataQualityMonitorConfig:
+    """P2-15: Data Quality Monitor configuration."""
+    enabled: bool = False
+    output_dir: str = "outputs/monitor"
+    report_name: str = "data_quality_monitor_report.md"
+    summary_csv_name: str = "data_quality_monitor_summary.csv"
+    inputs: MonitorInputsConfig = field(default_factory=MonitorInputsConfig)
+    thresholds: MonitorThresholdsConfig = field(default_factory=MonitorThresholdsConfig)
+    feature_gates: FeatureGatesConfig = field(default_factory=FeatureGatesConfig)
+
+
+@dataclass
 class SSSConfig:
     input_path: List[str] = field(default_factory=list)
     output_dir: str = "outputs"
@@ -251,6 +328,8 @@ class SSSConfig:
     label_quality: LabelQualityConfig = field(default_factory=LabelQualityConfig)
     coinglass: CoinGlassClientConfig = field(default_factory=CoinGlassClientConfig)
     label_enrichment: LabelEnrichmentConfig = field(default_factory=LabelEnrichmentConfig)
+    partial_context: PartialContextConfig = field(default_factory=PartialContextConfig)
+    data_quality_monitor: DataQualityMonitorConfig = field(default_factory=DataQualityMonitorConfig)
 
 
 def load_config(config_path: str) -> SSSConfig:
@@ -302,6 +381,8 @@ def load_config(config_path: str) -> SSSConfig:
     config.label_quality = _parse_label_quality(raw.get("label_quality", {}))
     config.coinglass = _parse_coinglass(raw.get("coinglass", {}))
     config.label_enrichment = _parse_label_enrichment(raw.get("label_enrichment", {}))
+    config.partial_context = _parse_partial_context(raw.get("partial_context", {}))
+    config.data_quality_monitor = _parse_data_quality_monitor(raw.get("data_quality_monitor", {}))
 
     # Validate consistency
     _validate_weights(config)
@@ -529,6 +610,8 @@ def _parse_coinglass(raw: dict) -> CoinGlassClientConfig:
         retry_count=int(raw.get("retry_count", 2)),
         retry_backoff_seconds=float(raw.get("retry_backoff_seconds", 2.0)),
         symbols=raw.get("symbols", ["BTC", "ETH"]),
+        fetcher_endpoints=raw.get("fetcher_endpoints"),
+        output_suffix=str(raw.get("output_suffix", "")),
         futures=futures,
         etf=etf,
         calendar=cal,
@@ -583,4 +666,69 @@ def _parse_label_enrichment(raw: dict) -> LabelEnrichmentConfig:
         alignment=alignment,
         thresholds=thresholds,
         fields=fields,
+    )
+
+
+def _parse_partial_context(raw: dict) -> PartialContextConfig:
+    """Parse partial_context config section (P2-14)."""
+    if not raw:
+        return PartialContextConfig()
+    return PartialContextConfig(
+        enabled=bool(raw.get("enabled", False)),
+        input_path=str(raw.get("input_path", "outputs/data_quality/enriched_trades_full_year.csv")),
+        quality_summary_path=str(raw.get("quality_summary_path", "outputs/data_quality_full_year/label_quality_summary.csv")),
+        output_dir=str(raw.get("output_dir", "outputs/context")),
+        summary_csv_name=str(raw.get("summary_csv_name", "partial_context_summary.csv")),
+        report_name=str(raw.get("report_name", "partial_context_report.md")),
+        mode=str(raw.get("mode", "partial_context_mode")),
+        informational_only=bool(raw.get("informational_only", True)),
+        group_by=raw.get("group_by", ["strategy_name", "regime"]),
+        fields=raw.get("fields", PartialContextConfig().fields),
+        excluded_fields=raw.get("excluded_fields", PartialContextConfig().excluded_fields),
+        min_coverage_for_field=float(raw.get("min_coverage_for_field", 0.80)),
+        top_n_values=int(raw.get("top_n_values", 5)),
+    )
+
+
+def _parse_data_quality_monitor(raw: dict) -> DataQualityMonitorConfig:
+    """Parse data_quality_monitor config section (P2-15)."""
+    if not raw:
+        return DataQualityMonitorConfig()
+    inp_raw = raw.get("inputs", {})
+    thr_raw = raw.get("thresholds", {})
+    fg_raw = raw.get("feature_gates", {})
+    return DataQualityMonitorConfig(
+        enabled=bool(raw.get("enabled", False)),
+        output_dir=str(raw.get("output_dir", "outputs/monitor")),
+        report_name=str(raw.get("report_name", "data_quality_monitor_report.md")),
+        summary_csv_name=str(raw.get("summary_csv_name", "data_quality_monitor_summary.csv")),
+        inputs=MonitorInputsConfig(
+            label_quality_summary=str(inp_raw.get("label_quality_summary",
+                MonitorInputsConfig().label_quality_summary)),
+            enrichment_audit_report=str(inp_raw.get("enrichment_audit_report",
+                MonitorInputsConfig().enrichment_audit_report)),
+            coinglass_fetch_report=str(inp_raw.get("coinglass_fetch_report",
+                MonitorInputsConfig().coinglass_fetch_report)),
+            partial_context_summary=str(inp_raw.get("partial_context_summary",
+                MonitorInputsConfig().partial_context_summary)),
+            official_baseline_dir=str(inp_raw.get("official_baseline_dir",
+                MonitorInputsConfig().official_baseline_dir)),
+            current_default_outputs_dir=str(inp_raw.get("current_default_outputs_dir",
+                MonitorInputsConfig().current_default_outputs_dir)),
+        ),
+        thresholds=MonitorThresholdsConfig(
+            pass_coverage=float(thr_raw.get("pass_coverage", 0.80)),
+            warn_coverage=float(thr_raw.get("warn_coverage", 0.50)),
+            max_allowed_enable_score_delta=float(thr_raw.get("max_allowed_enable_score_delta", 0.000001)),
+            require_context_fields_pass=thr_raw.get("require_context_fields_pass",
+                MonitorThresholdsConfig().require_context_fields_pass),
+        ),
+        feature_gates=FeatureGatesConfig(
+            classifier_requires=fg_raw.get("classifier_requires",
+                FeatureGatesConfig().classifier_requires),
+            market_opportunity_requires=fg_raw.get("market_opportunity_requires",
+                FeatureGatesConfig().market_opportunity_requires),
+            partial_context_requires=fg_raw.get("partial_context_requires",
+                FeatureGatesConfig().partial_context_requires),
+        ),
     )

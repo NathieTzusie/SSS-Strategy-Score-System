@@ -51,10 +51,12 @@ def _make_fake_dmc(tmp_path):
                 return {"regime": "trend_up", "regime_snapshot_id": f"trend_up_{self.snapshot_granularity}"}
 
         class StructureStateEnricher:
+            def __init__(self, symbol_4h_paths):
+                pass
             def bulk_prepare(self, trades):
                 pass
             def enrich(self, trade):
-                return {"structure_state": getattr(trade, "_regime_cache", "unknown")}
+                return {"structure_state": getattr(trade, "_regime_cache", "range")}
 
         class VolatilityEnricher:
             def __init__(self, symbol_4h_paths):

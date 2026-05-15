@@ -82,7 +82,7 @@ def apply_dmc_labels(df: pd.DataFrame, options: DMCBridgeOptions) -> tuple[pd.Da
     enrichers = [
         trade_log.RegimeEnricher(symbol_4h_paths, snapshot_granularity=options.snapshot_granularity),
         trade_log.SessionEnricher(),
-        trade_log.StructureStateEnricher(),
+        trade_log.StructureStateEnricher(symbol_4h_paths),
         trade_log.VolatilityEnricher(symbol_4h_paths),
     ]
 

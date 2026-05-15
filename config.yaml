@@ -1,8 +1,9 @@
 # Strategy Enable Score System v1.1 Configuration
 
 input_path:
-  - "outputs/data_quality/cleaned_trades.csv"
-
+  - "data/ETH_ATR_2025_01_2026_05_enriched.csv"
+  - "data/ETH_BAW_2025_01_2026_05_enriched.csv"
+  - "data/ETH_BTP_2025_01_2026_05_enriched.csv"
 output_dir: "outputs"
 
 min_trades: 30

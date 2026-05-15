@@ -1,0 +1,4 @@
+strategy_name,regime,n_trades,iterations,method,median_total_R,p5_total_R,p95_total_R,median_max_drawdown_R,p95_max_drawdown_R,worst_max_drawdown_R,median_longest_losing_streak,p95_longest_losing_streak,probability_of_negative_total_R,probability_drawdown_exceeds_threshold
+ETH_ATR,unknown,266,500,bootstrap,27.779100000000003,13.483527500000001,45.28649749999998,-3.5615249999999983,-2.144100000000001,-9.89635,5.5,8.0,0.002,0.0
+ETH_BAW,unknown,277,500,bootstrap,15.406874999999996,-3.4252625000000023,34.27573249999998,-7.00635,-4.001527500000001,-22.511250000000004,7.0,10.0,0.096,0.22
+ETH_BTP,unknown,243,500,bootstrap,9.323458000000004,-3.496376974999993,23.508387424999977,-6.481583250000006,-3.474610925000004,-19.93052,5.0,7.0499999999999545,0.128,0.144

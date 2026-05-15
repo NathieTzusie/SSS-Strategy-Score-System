@@ -12,6 +12,8 @@ from strategy_enable_system.label_quality import (
     is_missing,
     classify_session,
     normalize_snapshot,
+    ensure_label_columns,
+    normalize_duplicate_trade_ids,
     fix_labels,
     build_quality_report,
     validate_required_columns,
@@ -121,6 +123,52 @@ class TestNormalizeSnapshot:
 
 
 class TestFixLabels:
+    def test_duplicate_trade_ids_are_namespaced(self):
+        df = _make_df([
+            {"trade_id": "TV_1", "strategy_name": "ATR_ETH", "regime": "trend_up",
+             "entry_time": "2026-01-05 10:00:00"},
+            {"trade_id": "TV_1", "strategy_name": "BAW_ETH", "regime": "trend_up",
+             "entry_time": "2026-01-05 11:00:00"},
+        ])
+        fixed = normalize_duplicate_trade_ids(df)
+        assert fixed == 2
+        assert df["trade_id"].tolist() == ["ATR_ETH_TV_1", "BAW_ETH_TV_1"]
+        assert df["original_trade_id"].tolist() == ["TV_1", "TV_1"]
+
+    def test_unique_trade_ids_are_not_changed(self):
+        df = _make_df([
+            {"trade_id": "TV_1", "strategy_name": "ATR_ETH"},
+            {"trade_id": "TV_2", "strategy_name": "ATR_ETH"},
+        ])
+        fixed = normalize_duplicate_trade_ids(df)
+        assert fixed == 0
+        assert df["trade_id"].tolist() == ["TV_1", "TV_2"]
+        assert "original_trade_id" not in df.columns
+
+    def test_missing_label_columns_are_created(self):
+        df = _make_df([
+            {"trade_id": "T1", "strategy_name": "S1", "regime": "trend_up",
+             "entry_time": "2026-01-05 10:00:00"},
+        ])
+        ensure_label_columns(df)
+        for col in ["session", "structure_state", "regime_snapshot_id",
+                    "volatility_state", "orderflow_state", "macro_state"]:
+            assert col in df.columns
+            assert df.at[0, col] == "unknown"
+
+    def test_fix_labels_accepts_minimal_core_csv(self):
+        df = _make_df([
+            {"trade_id": "T1", "strategy_name": "S1", "regime": "trend_up",
+             "entry_time": "2026-01-05 10:00:00", "pnl_R": 1.0},
+        ])
+        config = _make_config()
+        fixes = fix_labels(df, config)
+        assert fixes["session_fixed"] == 1
+        assert df.at[0, "session"] == "London"
+        assert df.at[0, "structure_state"] == "trend_up"
+        assert df.at[0, "regime_snapshot_id"] == "trend_up_20260105"
+        assert df.at[0, "pnl_R"] == 1.0
+
     def test_session_backfill_from_unknown(self):
         df = _make_df([
             {"trade_id": "T1", "strategy_name": "S1", "regime": "trend_up",

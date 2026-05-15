@@ -1,0 +1,44 @@
+﻿input_path:
+  - "outputs/data_quality/cleaned_trades.csv"
+output_dir: "outputs/tv_cleaned_validation"
+min_trades: 30
+recent_trade_window: 20
+monte_carlo:
+  iterations: 500
+  method: "bootstrap"
+  drawdown_threshold_R: 10
+  random_seed: 42
+market_opportunity:
+  enabled: false
+  default_score: 1.0
+edge_concentration:
+  enabled: true
+  largest_win_warning_threshold: 0.35
+  top_5_warning_threshold: 0.60
+  top_10_percent_warning_threshold: 0.70
+score_weights:
+  regime_edge: 0.40
+  recent_health: 0.15
+  monte_carlo_stability: 0.25
+  risk_control: 0.20
+score_thresholds:
+  strong_enable: 80
+  medium_enable: 65
+  weak_enable: 50
+metric_caps:
+  max_profit_factor: 10.0
+  max_payoff_ratio: 10.0
+review_rules:
+  losing_streak_review_threshold: 4
+  mc_drawdown_probability_review_threshold: 0.25
+  low_sample_requires_review: true
+  edge_concentration_requires_review: true
+filters:
+  symbol: []
+  strategy_name: []
+  date_start: null
+  date_end: null
+validation:
+  duplicate_trade_id: "warning"
+  require_exit_after_entry: true
+  fill_missing_state_with: "unknown"

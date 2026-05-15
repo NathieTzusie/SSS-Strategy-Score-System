@@ -15,6 +15,7 @@ import os
 import sys
 import argparse
 import logging
+import re
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict
@@ -29,6 +30,15 @@ logger = logging.getLogger(__name__)
 
 # Fields considered "missing" when they are NaN, empty string, or "unknown"
 _MISSING_VALUES = {None, "", "unknown", "Unknown", "UNKNOWN"}
+
+LABEL_OPTIONAL_COLUMNS = [
+    "session",
+    "structure_state",
+    "regime_snapshot_id",
+    "volatility_state",
+    "orderflow_state",
+    "macro_state",
+]
 
 
 def is_missing(val) -> bool:
@@ -88,6 +98,63 @@ def normalize_snapshot(regime: str, entry_dt: datetime, fmt: str) -> str:
     """Generate a normalized regime_snapshot_id from regime and entry_time."""
     date_str = entry_dt.strftime("%Y%m%d")
     return fmt.replace("{regime}", str(regime)).replace("{YYYYMMDD}", date_str)
+
+
+def ensure_label_columns(df: pd.DataFrame, fill_value: str = "unknown") -> pd.DataFrame:
+    """Ensure optional label columns exist before label quality fixes run.
+
+    TradingView-converted or manually prepared CSV files may contain only the
+    core SSS fields. The label governance tool should accept those files and
+    create missing label columns as unknown instead of failing with KeyError.
+    """
+    for col in LABEL_OPTIONAL_COLUMNS:
+        if col not in df.columns:
+            df[col] = fill_value
+        else:
+            df[col] = df[col].fillna(fill_value)
+    return df
+
+
+def normalize_duplicate_trade_ids(
+    df: pd.DataFrame,
+    preserve_column: str = "original_trade_id",
+) -> int:
+    """Make duplicate trade_id values unique while preserving the original ID.
+
+    TradingView strategy exports often restart trade numbering per strategy.
+    After multiple converted CSVs are merged, IDs like TV_1, TV_2 repeat.
+    This function only rewrites rows whose trade_id is duplicated, using
+    strategy_name as a stable namespace.
+    """
+    if "trade_id" not in df.columns:
+        return 0
+    dup_mask = df.duplicated(subset="trade_id", keep=False)
+    if not dup_mask.any():
+        return 0
+
+    if preserve_column not in df.columns:
+        df[preserve_column] = df["trade_id"]
+
+    fixed_count = 0
+    seen = {}
+    for idx in df[dup_mask].index:
+        original = str(df.at[idx, "trade_id"])
+        strategy = str(df.at[idx, "strategy_name"]) if "strategy_name" in df.columns else "strategy"
+        base = f"{_safe_id_part(strategy)}_{_safe_id_part(original)}"
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+        new_id = base if count == 1 else f"{base}_{count}"
+        if df.at[idx, "trade_id"] != new_id:
+            df.at[idx, "trade_id"] = new_id
+            fixed_count += 1
+    return fixed_count
+
+
+def _safe_id_part(value: str) -> str:
+    """Return an ASCII-ish stable identifier segment."""
+    text = re.sub(r"[^A-Za-z0-9]+", "_", str(value).strip())
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text or "unknown"
 
 
 # ============================================================
@@ -251,7 +318,9 @@ def compute_all_field_qualities(original_df: pd.DataFrame, fixed_df: pd.DataFram
 
 def fix_labels(df: pd.DataFrame, config: LabelQualityConfig):
     """Apply all label fixes to a DataFrame and return fix counts."""
+    ensure_label_columns(df)
     fixes: Dict[str, int] = {}
+    fixes["trade_id_deduplicated"] = normalize_duplicate_trade_ids(df)
 
     # --- Session backfill ---
     sb = config.session_backfill
@@ -371,7 +440,11 @@ def build_quality_report(original_df: pd.DataFrame, fixed_df: pd.DataFrame, fixe
         orig_col = config.regime_snapshot_normalization.preserve_original_column
         lines.append(f"- 原始值保留于：`{orig_col}`")
     
-    lines.append(f"\n**✅ unique 数从 {orig_unique} → {fixed_unique}（下降 {(1-fixed_unique/orig_unique)*100:.0f}%）**")
+    if orig_unique > 0:
+        unique_change = (1 - fixed_unique / orig_unique) * 100
+        lines.append(f"\n**✅ unique 数从 {orig_unique} → {fixed_unique}（变化 {unique_change:.0f}%）**")
+    else:
+        lines.append(f"\n**✅ unique 数从 {orig_unique} → {fixed_unique}**")
     lines.append("")
     
     # Summary
@@ -381,6 +454,7 @@ def build_quality_report(original_df: pd.DataFrame, fixed_df: pd.DataFrame, fixe
     lines.append(f"| session | {fixes.get('session_fixed', 0)} | UTC 小时 → 交易时段 |")
     lines.append(f"| structure_state | {fixes.get('structure_state_fixed', 0)} | 来源：{config.structure_state_backfill.source_field} |")
     lines.append(f"| regime_snapshot_id | {fixes.get('snapshot_normalized', 0)} | 格式：{config.regime_snapshot_normalization.format} |")
+    lines.append(f"| trade_id | {fixes.get('trade_id_deduplicated', 0)} | 仅重复 ID 会被命名空间化，原值保留在 original_trade_id |")
     lines.append("")
     
     # --- P2-5: Field Quality Scores ---
@@ -440,7 +514,8 @@ def build_quality_report(original_df: pd.DataFrame, fixed_df: pd.DataFrame, fixe
         lines.append("")
     
     h(2, "风险提示")
-    lines.append("- ⚠️ 本工具只做标签治理（session / structure_state / regime_snapshot_id），**不改变 pnl_R、trade_id、strategy_name、regime**")
+    lines.append("- ⚠️ 本工具只做标签治理（session / structure_state / regime_snapshot_id / duplicate trade_id），**不改变 pnl_R、strategy_name、regime**")
+    lines.append("- ⚠️ 只有当 `trade_id` 重复时才会改写重复 ID，并把原值保留在 `original_trade_id`")
     lines.append("- ⚠️ 本工具**不改变评分逻辑**，修复后重新运行 `main.py` 时 Enable Score 不变")
     lines.append("- ⚠️ 本工具**不覆盖原始 CSV**，输出为新文件")
     lines.append("- ⚠️ `structure_state` 直接复制自 `regime`，不推断复杂结构")
@@ -550,6 +625,8 @@ def run(config_path: str, input_override: str = None, output_dir_override: str =
     
     # Work on a copy
     fixed_df = original_df.copy()
+    ensure_label_columns(original_df)
+    ensure_label_columns(fixed_df)
     
     # Apply fixes
     logger.info("Applying label fixes...")
@@ -561,7 +638,7 @@ def run(config_path: str, input_override: str = None, output_dir_override: str =
     snapshot_diag = compute_snapshot_granularity(original_df, fixed_df, lq)
     readiness = compute_readiness(field_qualities, snapshot_diag, lq)
     
-    logger.info(f"Readiness — classifier: {readiness['automatic_regime_classifier']['readiness']}, "
+    logger.info(f"Readiness - classifier: {readiness['automatic_regime_classifier']['readiness']}, "
                 f"market_opportunity: {readiness['market_opportunity_score']['readiness']}, "
                 f"layered: {readiness['layered_regime_analysis']['readiness']}")
     
@@ -595,9 +672,10 @@ def run(config_path: str, input_override: str = None, output_dir_override: str =
     snap_after = fixed_df["regime_snapshot_id"].nunique() if "regime_snapshot_id" in fixed_df.columns else 0
     
     logger.info("=== Quality Changes ===")
-    logger.info(f"session:        {session_before} → {session_after} unknown ({session_before - session_after} fixed)")
-    logger.info(f"structure_state: {ss_before} → {ss_after} unknown ({ss_before - ss_after} fixed)")
-    logger.info(f"snapshot unique: {snap_before} → {snap_after} (from {snap_before} to {snap_after})")
+    logger.info(f"session:        {session_before} -> {session_after} unknown ({session_before - session_after} fixed)")
+    logger.info(f"structure_state: {ss_before} -> {ss_after} unknown ({ss_before - ss_after} fixed)")
+    logger.info(f"snapshot unique: {snap_before} -> {snap_after} (from {snap_before} to {snap_after})")
+    logger.info(f"trade_id duplicates fixed: {fixes.get('trade_id_deduplicated', 0)}")
     logger.info("Done.")
 
 

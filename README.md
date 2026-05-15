@@ -63,6 +63,152 @@ CSV 格式，支持单文件或多文件合并。详见 `data/sample_trades.csv`
 
 缺失的可选字段自动填充 `"unknown"`。
 
+## TradingView CSV 转换工具
+
+如果交易记录来自 TradingView Strategy Tester，先转换成系统标准 CSV，再运行 P2-2 标签治理工具。转换器只负责字段映射和 `pnl_R` 计算，不负责判断真实市场标签。
+
+### 推荐流程
+
+1. **转换**：把每个 TradingView CSV 转为标准交易 CSV。
+   ```bash
+   PYTHONPATH=src python3 -m strategy_enable_system.tradingview_converter \
+     --input data/tradingview_export.csv \
+     --output data/tradingview_converted.csv \
+     --strategy-name "TV_Strategy" \
+     --symbol BTCUSDT \
+     --regime unknown \
+     --risk-usd 100
+   ```
+
+2. **治理**：将 `config.yaml input_path` 指向转换后的 CSV，然后运行标签治理。
+   ```bash
+   PYTHONPATH=src python3 -m strategy_enable_system.label_quality --config config.yaml
+   ```
+
+3. **评分**：使用治理后的 `outputs/data_quality/cleaned_trades.csv` 运行主流程。
+   ```bash
+   PYTHONPATH=src python3 -m strategy_enable_system.main --config config.yaml
+   ```
+
+⚠️ 多个 TradingView 文件合并时必须运行标签治理。TradingView 的 `Trade #` 会从 1 重新编号，多个策略合并后容易出现重复 `trade_id`；标签治理会将重复 ID 命名空间化，并把原始值保留到 `original_trade_id`。
+
+### 可选：单文件转换后自动治理
+
+如果只处理单个 TradingView 文件，可以让转换器额外输出一份 cleaned CSV：
+
+```bash
+PYTHONPATH=src python3 -m strategy_enable_system.tradingview_converter \
+  --input data/tradingview_export.csv \
+  --output data/tradingview_converted.csv \
+  --strategy-name "TV_Strategy" \
+  --symbol BTCUSDT \
+  --regime unknown \
+  --risk-usd 100 \
+  --apply-label-quality \
+  --cleaned-output data/tradingview_converted_cleaned.csv
+```
+
+这个选项会自动回填 `session`、`structure_state`、`regime_snapshot_id`，并补齐缺失标签列。多文件场景仍建议使用独立的 `label_quality` 流程统一治理。
+
+### 可选：单文件转换后同时 Enrich
+
+如果本地已经有 CoinGlass processed 数据，也可以在转换后同时生成 enriched CSV。该流程固定为：转换 -> 标签治理 -> enrichment；不会直接对未治理 CSV 做 enrichment。
+
+```bash
+PYTHONPATH=src python3 -m strategy_enable_system.tradingview_converter \
+  --input data/tradingview_export.csv \
+  --output data/tradingview_converted.csv \
+  --strategy-name "TV_Strategy" \
+  --symbol BTCUSDT \
+  --regime unknown \
+  --risk-usd 100 \
+  --apply-enrichment \
+  --enrichment-processed-dir data/external/coinglass/processed \
+  --enriched-output data/tradingview_converted_enriched.csv
+```
+
+`--apply-enrichment` 会自动额外写出 cleaned CSV。它只读取已经缓存/处理好的外部数据，不会抓取 CoinGlass live API。多文件场景仍建议先统一运行 `label_quality`，再运行独立的 `label_enrichment`。
+
+### 可选：调用 DMC 回测引擎修整 TV 标签
+
+如果 TradingView CSV 缺少回测引擎标签，可以让转换器调用本地 `DMC-Sisie-Quantive` 的 enricher，回填 `session`、`regime`、`regime_snapshot_id`、`structure_state`、`volatility_state`：
+
+```bash
+PYTHONPATH=src python3 -m strategy_enable_system.tradingview_converter \
+  --input data/tradingview_export.csv \
+  --output data/tradingview_converted.csv \
+  --strategy-name "TV_Strategy" \
+  --symbol BTCUSDT \
+  --risk-usd 100 \
+  --apply-dmc-labels \
+  --dmc-root C:/Users/12645/DMC-Sisie-Quantive \
+  --dmc-snapshot-granularity day
+```
+
+默认会额外生成：
+
+```text
+data/tradingview_converted_dmc_labeled.csv
+data/tradingview_converted_dmc_labeled_dmc_bridge_report.md
+```
+
+DMC bridge 只负责本地回测引擎能可靠提供的标签，不回填 OI / Funding / CVD / ETF / Macro / Coinbase Premium。
+
+### 可选：转换后自动更新 config.yaml
+
+如果希望转换后自动把结果加入 `config.yaml input_path`，加上 `--update-config-input`：
+
+```bash
+PYTHONPATH=src python3 -m strategy_enable_system.tradingview_converter \
+  --input data/tradingview_export.csv \
+  --output data/tradingview_converted.csv \
+  --strategy-name "TV_Strategy" \
+  --symbol BTCUSDT \
+  --regime unknown \
+  --risk-usd 100 \
+  --update-config-input \
+  --config config.yaml
+```
+
+规则：
+
+| 场景 | 写入 `input_path` 的文件 |
+|------|--------------------------|
+| 普通转换 | `--output` 指定的 converted CSV |
+| `--apply-label-quality` | 仍写入 converted CSV，后续建议统一跑 `label_quality` |
+| `--apply-dmc-labels` | DMC 修整后的 CSV |
+| `--apply-enrichment` | 写入 enriched CSV |
+
+已存在的路径不会重复写入。
+
+### 支持格式
+
+| 格式 | 说明 |
+|------|------|
+| closed | 一行一笔完整交易，包含 entry/exit time、direction、profit |
+| paired | TradingView entry/exit 两行格式，按 trade number 配对 |
+| auto | 默认自动识别上述两类 |
+
+### `pnl_R` 规则
+
+转换器不会把 USD 盈亏直接当成 `pnl_R`。必须满足二选一：
+
+```bash
+# 方式 A：提供固定 1R 金额
+--risk-usd 100
+
+# 方式 B：TradingView CSV 中已有 R 倍数字段
+--pnl-r-column "R Multiple"
+```
+
+输出文件会同时生成一份审计报告：
+
+```text
+data/tradingview_converted_conversion_report.md
+```
+
+转换后的原始 CSV 不建议直接作为最终评分输入。推荐先进入 label quality 流程，生成 `outputs/data_quality/cleaned_trades.csv` 后再评分。
+
 ## 输出文件
 
 | 文件 | 说明 |

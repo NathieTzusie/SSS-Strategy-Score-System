@@ -1,0 +1,7 @@
+field,total_rows,unknown_before,unknown_after,unknown_ratio_before,unknown_ratio_after,fixed_count,notes,quality_score_before,quality_score_after,readiness_status
+session,266,266,0,1.0,0.0,266,,0.0,100.0,PASS
+structure_state,266,266,266,1.0,1.0,0,,0.0,0.0,BLOCK
+volatility_state,266,266,266,1.0,1.0,0,,0.0,0.0,BLOCK
+orderflow_state,266,266,266,1.0,1.0,0,,0.0,0.0,BLOCK
+macro_state,266,266,266,1.0,1.0,0,,0.0,0.0,BLOCK
+regime_snapshot_id,266,1,167,0.0038,0.6278,266,unique count,99.6,37.2,

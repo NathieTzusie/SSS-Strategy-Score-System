@@ -1,0 +1,4 @@
+strategy_name,regime,enable_score,market_opportunity_score,final_activation_score,status,regime_edge_score,recent_health_score,monte_carlo_stability_score,risk_control_score,sample_confidence_multiplier,recent_loss_penalty,mc_tail_risk_penalty,edge_concentration_penalty,score_drivers,penalty_drivers,primary_reason,risk_notes,review_required,low_sample_warning,edge_concentration_warning
+ETH_ATR,unknown,66.57,1.0,66.57,中等开启,69.88,66.32,76.18,48.15,1.0,1.0,1.0,1.0,healthy_mc_distribution,,中等开启：基础指标可接受，部分子分数偏低,,False,False,False
+ETH_BAW,unknown,54.62,1.0,54.62,弱开启,61.75,63.7,62.92,46.94,1.0,1.0,0.92,1.0,,high_mc_tail_drawdown,弱开启：high_mc_tail_drawdown等风险因素存在,MC尾部风险偏高：P(drawdown > 10.0R) = 22.0%,False,False,False
+ETH_BTP,unknown,55.91,1.0,55.91,弱开启,60.94,58.64,65.07,32.35,1.0,1.0,1.0,1.0,,,弱开启：表现不稳定或样本不足,,False,False,False

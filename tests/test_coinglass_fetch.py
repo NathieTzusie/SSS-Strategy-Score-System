@@ -216,7 +216,7 @@ class TestMockMode:
             run_mock(config)
             report = os.path.join(tmp, "output", "fetch_audit_report.md")
             assert os.path.exists(report)
-            content = open(report).read()
+            content = open(report, encoding="utf-8").read()
             assert "mock" in content.lower()
 
     def test_baseline_not_modified_by_mock(self):

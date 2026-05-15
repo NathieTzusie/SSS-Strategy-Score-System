@@ -38,7 +38,7 @@ class DMCBridgeOptions:
 
     input_path: str
     output_path: str
-    dmc_root: str = r"C:\Users\12645\DMC-Sisie-Quantive"
+    dmc_root: str = "/mnt/c/Users/12645/DMC-Sisie-Quantive"
     snapshot_granularity: str = "week"
     overwrite: bool = False
     preserve_original_columns: bool = True
@@ -294,7 +294,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Backfill SSS labels using local DMC enrichers.")
     parser.add_argument("--input", required=True, dest="input_path", help="Input SSS CSV path.")
     parser.add_argument("--output", required=True, dest="output_path", help="Output CSV path.")
-    parser.add_argument("--dmc-root", default=r"C:\Users\12645\DMC-Sisie-Quantive", help="Local DMC project root.")
+    parser.add_argument("--dmc-root", default="/mnt/c/Users/12645/DMC-Sisie-Quantive", help="Local DMC project root.")
     parser.add_argument("--snapshot-granularity", choices=["day", "week", "month"], default="week")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing non-unknown labels.")
     parser.add_argument(

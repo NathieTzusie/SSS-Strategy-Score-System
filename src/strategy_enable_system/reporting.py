@@ -61,7 +61,12 @@ def resolve_run_dir(
     # Handle existing directory
     if os.path.exists(run_dir) and not overwrite:
         time_suffix = datetime.now().strftime("%H%M%S")
-        run_dir = os.path.join(output_dir, today, f"{slug}__{time_suffix}")
+        base = os.path.join(output_dir, today, f"{slug}__{time_suffix}")
+        run_dir = base
+        counter = 2
+        while os.path.exists(run_dir):
+            run_dir = f"{base}_{counter}"
+            counter += 1
 
     return run_dir
 
@@ -96,14 +101,28 @@ def _shorten_strategy(name: str) -> str:
 
 
 def _sanitize_slug(name: str) -> str:
-    """Sanitize a user-supplied run name into a safe directory slug."""
+    """Sanitize a user-supplied run name into a safe directory slug.
+
+    - Lowercase + replace spaces/dashes with underscores
+    - Strip any non-alphanumeric/non-underscore/non-plus chars
+    - Collapse multiple underscores
+    - Enforce max length of 64 chars
+    - Never return empty slug
+    """
     slug = name.strip().lower().replace(" ", "_").replace("-", "_")
     slug = re.sub(r"[^a-z0-9_+]", "", slug)
     slug = re.sub(r"_+", "_", slug)
-    return slug.strip("_")
+    slug = slug.strip("_+")[:64]
+    return slug if slug else "default_run"
 
 
-def _write_run_metadata(run_dir: str, trades: pd.DataFrame, config: SSSConfig):
+def _write_run_metadata(
+    run_dir: str,
+    trades: pd.DataFrame,
+    config: SSSConfig,
+    pm_row_count: int = 0,
+    es_row_count: int = 0,
+):
     """Write run_metadata.yaml to the run directory."""
     strategies = (
         sorted(trades["strategy_name"].dropna().unique().tolist())
@@ -117,12 +136,25 @@ def _write_run_metadata(run_dir: str, trades: pd.DataFrame, config: SSSConfig):
     )
 
     metadata = {
+        "schema_version": 1,
+        "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "run_mode": config.report_output.run_mode,
+        "report_dir": run_dir,
         "config_path": getattr(config, "_config_path", "unknown"),
         "input_files": list(config.input_path),
+        "symbol": symbols[0] if len(symbols) == 1 else "+".join(symbols),
         "strategies": strategies,
-        "symbols": symbols,
-        "trade_count": len(trades),
-        "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "row_counts": {
+            "trades": len(trades),
+            "performance_matrix": pm_row_count,
+            "enable_scores": es_row_count,
+        },
+        "outputs": {
+            "performance_matrix": "performance_matrix.csv",
+            "monte_carlo_results": "monte_carlo_results.csv",
+            "enable_scores": "enable_score.csv",
+            "summary_report": "summary_report.md",
+        },
         "sss_version": "v1.1",
     }
 
@@ -175,7 +207,11 @@ def generate_report(
 
     # Write run metadata (only in non-legacy mode)
     if ro.run_mode != "legacy":
-        _write_run_metadata(out_dir, trades, config)
+        _write_run_metadata(
+            out_dir, trades, config,
+            pm_row_count=len(performance_matrix),
+            es_row_count=len(enable_scores),
+        )
 
     # Generate Markdown summary
     md_content = _build_markdown_summary(performance_matrix, monte_carlo_results, enable_scores, trades, config)

@@ -107,21 +107,27 @@ def main():
         for status_name in ["强开启", "中等开启", "弱开启", "禁用"]:
             logger.info(f"  {status_name}: {status_counts.get(status_name, 0)}")
 
-    # JSON mode output
+    # JSON mode output (stable schema for DMC integration)
     if args.json:
         import json
         json_out = {
             "status": "ok",
             "report_dir": report_dir,
-            "summary_report": md_path,
-            "performance_matrix": os.path.join(report_dir, "performance_matrix.csv"),
-            "monte_carlo_results": os.path.join(report_dir, "monte_carlo_results.csv"),
-            "enable_score": os.path.join(report_dir, "enable_score.csv"),
+            "run_mode": config.report_output.run_mode,
+            "outputs": {
+                "summary_report": md_path,
+                "performance_matrix": os.path.join(report_dir, "performance_matrix.csv"),
+                "enable_scores": os.path.join(report_dir, "enable_score.csv"),
+                "monte_carlo_results": os.path.join(report_dir, "monte_carlo_results.csv"),
+                "run_metadata": os.path.join(report_dir, "run_metadata.yaml") if config.report_output.run_mode != "legacy" else None,
+            },
             "total_trades": len(trades),
             "strategy_count": trades["strategy_name"].nunique() if "strategy_name" in trades.columns else 0,
             "status_counts": status_counts,
+            "warnings": [],
         }
-        print(json.dumps(json_out, ensure_ascii=False))
+        # JSON to stdout only; everything else on stderr via logging
+        sys.stdout.write(json.dumps(json_out, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":

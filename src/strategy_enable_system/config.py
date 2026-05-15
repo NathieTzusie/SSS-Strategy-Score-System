@@ -344,6 +344,12 @@ class SSSConfig:
     label_enrichment: LabelEnrichmentConfig = field(default_factory=LabelEnrichmentConfig)
     partial_context: PartialContextConfig = field(default_factory=PartialContextConfig)
     data_quality_monitor: DataQualityMonitorConfig = field(default_factory=DataQualityMonitorConfig)
+    recommendations: "RecommendationsConfig" = field(default_factory=lambda: _default_recommendations())
+
+
+def _default_recommendations():
+    from .recommendations import RecommendationsConfig
+    return RecommendationsConfig()
 
 
 def load_config(config_path: str) -> SSSConfig:
@@ -397,6 +403,7 @@ def load_config(config_path: str) -> SSSConfig:
     config.label_enrichment = _parse_label_enrichment(raw.get("label_enrichment", {}))
     config.partial_context = _parse_partial_context(raw.get("partial_context", {}))
     config.data_quality_monitor = _parse_data_quality_monitor(raw.get("data_quality_monitor", {}))
+    config.recommendations = _parse_recommendations(raw.get("recommendations", {}))
 
     # Validate consistency
     _validate_weights(config)
@@ -745,4 +752,23 @@ def _parse_data_quality_monitor(raw: dict) -> DataQualityMonitorConfig:
             partial_context_requires=fg_raw.get("partial_context_requires",
                 FeatureGatesConfig().partial_context_requires),
         ),
+    )
+
+
+def _parse_recommendations(raw: dict) -> "RecommendationsConfig":
+    from .recommendations import RecommendationsConfig
+    return RecommendationsConfig(
+        enabled=bool(raw.get("enabled", True)),
+        min_strategy_trade_count=int(raw.get("min_strategy_trade_count", 30)),
+        min_group_trade_count=int(raw.get("min_group_trade_count", 15)),
+        poor_profit_factor=float(raw.get("poor_profit_factor", 1.0)),
+        weak_profit_factor=float(raw.get("weak_profit_factor", 1.2)),
+        poor_win_rate=float(raw.get("poor_win_rate", 0.45)),
+        weak_win_rate=float(raw.get("weak_win_rate", 0.50)),
+        high_drawdown_R=float(raw.get("high_drawdown_R", 5.0)),
+        low_payoff_ratio=float(raw.get("low_payoff_ratio", 0.8)),
+        high_payoff_ratio=float(raw.get("high_payoff_ratio", 1.5)),
+        poor_avg_R=float(raw.get("poor_avg_R", 0.0)),
+        high_loss_concentration_R=float(raw.get("high_loss_concentration_R", 0.5)),
+        max_recommendations=int(raw.get("max_recommendations", 50)),
     )

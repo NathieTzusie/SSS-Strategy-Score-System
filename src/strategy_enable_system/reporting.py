@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 from .config import SSSConfig
+from .recommendations import RecommendationResult
 from .utils import to_csv_utf8sig
 
 
@@ -169,6 +170,7 @@ def generate_report(
     enable_scores: pd.DataFrame,
     trades: pd.DataFrame,
     config: SSSConfig,
+    rec_result: Optional[RecommendationResult] = None,
 ) -> str:
     """Generate all output files: CSVs and Markdown summary.
 
@@ -178,6 +180,7 @@ def generate_report(
         enable_scores: Enable score results.
         trades: Original standardized trades DataFrame (for distribution stats).
         config: SSSConfig object.
+        rec_result: Optional recommendation result for inclusion in report.
 
     Returns:
         str: Path to the generated summary_report.md.
@@ -213,8 +216,17 @@ def generate_report(
             es_row_count=len(enable_scores),
         )
 
+    # Write recommendations if available
+    if rec_result and rec_result.recommendations:
+        rec_result.write_csv(os.path.join(out_dir, "recommendations.csv"))
+        rec_result.write_markdown(os.path.join(out_dir, "recommendations.md"))
+
     # Generate Markdown summary
-    md_content = _build_markdown_summary(performance_matrix, monte_carlo_results, enable_scores, trades, config)
+    rec_summary = rec_result.recommendations if rec_result else []
+    md_content = _build_markdown_summary(
+        performance_matrix, monte_carlo_results, enable_scores,
+        trades, config, rec_summary,
+    )
     md_path = os.path.join(out_dir, "summary_report.md")
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md_content)
@@ -228,6 +240,7 @@ def _build_markdown_summary(
     es: pd.DataFrame,
     trades: pd.DataFrame,
     config: SSSConfig,
+    recommendations: Optional[List] = None,
 ) -> str:
     """Build the Markdown summary report."""
     lines: List[str] = []
@@ -385,7 +398,17 @@ def _build_markdown_summary(
     # P2-1: Time Under Water / Recovery 风险
     # ========================
     _build_tuw_section(lines, pm, config)
-    
+
+    # ========================
+    # Recommendations summary
+    # ========================
+    if recommendations:
+        from .recommendations import render_recommendations_summary
+        rec_summary = render_recommendations_summary(recommendations)
+        if rec_summary:
+            lines.append(rec_summary)
+            lines.append("")
+
     # ========================
     # Footer
     # ========================

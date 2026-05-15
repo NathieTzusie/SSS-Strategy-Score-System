@@ -17,6 +17,7 @@ from strategy_enable_system.metrics import compute_performance_matrix
 from strategy_enable_system.monte_carlo import run_monte_carlo
 from strategy_enable_system.scoring import compute_enable_scores
 from strategy_enable_system.reporting import generate_report
+from strategy_enable_system.recommendations import generate_recommendations, render_recommendations_summary
 
 logging.basicConfig(
     level=logging.INFO,
@@ -93,8 +94,15 @@ def main():
     scores = compute_enable_scores(pm, mc, config)
     logger.info(f"Enable scores: {len(scores)} combinations scored")
 
+    logger.info("Generating recommendations...")
+    rec_result = generate_recommendations(pm, scores, trades, config.recommendations)
+    if rec_result.recommendations:
+        logger.info(f"Generated {len(rec_result.recommendations)} recommendations")
+    else:
+        logger.info("No recommendations generated (module disabled or no triggers)")
+
     logger.info("Generating reports...")
-    md_path = generate_report(pm, mc, scores, trades, config)
+    md_path = generate_report(pm, mc, scores, trades, config, rec_result)
     report_dir = os.path.dirname(md_path)
 
     logger.info(f"Done! Report: {md_path}")

@@ -41,10 +41,18 @@ LAYERED_REGIME_FIELDS = [
     "macro_state",
 ]
 
+# DMC bridge audit columns (informational, not used for scoring)
+DMC_AUDIT_FIELDS = [
+    "dmc_label_confidence",
+    "dmc_label_source",
+    "dmc_label_version",
+]
+
 # All fields that should exist in the output DataFrame
 ALL_EXPECTED_FIELDS = sorted(set(
     CORE_FIELDS + OPTIONAL_FIELDS + STATUS_FIELDS
     + ["regime_snapshot_id", "structure_state", "orderflow_state", "macro_state"]
+    + DMC_AUDIT_FIELDS
 ))
 
 

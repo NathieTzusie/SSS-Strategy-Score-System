@@ -30,6 +30,13 @@ DMC_FIELDS = [
     "structure_state",
     "volatility_state",
 ]
+DMC_AUDIT_COLUMNS = [
+    "dmc_label_confidence",
+    "dmc_label_source",
+    "dmc_label_version",
+]
+DMC_LABEL_SOURCE = "dmc_bridge_v1"
+DMC_LABEL_VERSION = "1.0"
 
 
 @dataclass
@@ -60,6 +67,7 @@ def backfill_with_dmc(options: DMCBridgeOptions) -> pd.DataFrame:
     df = pd.read_csv(options.input_path)
     _validate_input_columns(df)
     result, stats = apply_dmc_labels(df, options)
+    result = _add_dmc_audit_columns(result, options, stats)
 
     os.makedirs(os.path.dirname(options.output_path) or ".", exist_ok=True)
     result.to_csv(options.output_path, index=False)
@@ -179,6 +187,49 @@ def is_missing(value: Any) -> bool:
     return str(value).strip().lower() in {"", "unknown", "nan", "none"}
 
 
+def _add_dmc_audit_columns(
+    result: pd.DataFrame,
+    options: DMCBridgeOptions,
+    stats: Dict[str, Dict[str, int]],
+) -> pd.DataFrame:
+    """Add dmc_label_confidence, dmc_label_source, dmc_label_version audit columns.
+
+    dmc_label_confidence per field per row (JSON):
+      direct  — DMC enricher computed this label directly
+      derived — label was derived from another label (e.g. structure_state v1 ← regime)
+      none    — DMC could not provide this label (value = unknown)
+    """
+    out = result.copy()
+
+    # dmc_label_source and dmc_label_version are constant across all rows
+    out["dmc_label_source"] = DMC_LABEL_SOURCE
+    out["dmc_label_version"] = DMC_LABEL_VERSION
+
+    # Compute per-row confidence JSON
+    confidences = []
+    for idx, row in out.iterrows():
+        row_conf = {}
+        for field_name in options.fields:
+            value = row.get(field_name, UNKNOWN)
+            if is_missing(value):
+                row_conf[field_name] = "none"
+            elif field_name == "structure_state":
+                # v2: structure_state is independently computed by ADX → direct
+                # v1 legacy marker: if structure_state == regime, it was derived
+                regime_val = row.get("regime", UNKNOWN)
+                if not is_missing(value) and not is_missing(regime_val) and str(value) == str(regime_val):
+                    row_conf[field_name] = "derived"
+                else:
+                    row_conf[field_name] = "direct"
+            else:
+                # session, regime, regime_snapshot_id, volatility_state are always direct
+                row_conf[field_name] = "direct"
+        confidences.append(json.dumps(row_conf, ensure_ascii=False))
+
+    out["dmc_label_confidence"] = confidences
+    return out
+
+
 def build_dmc_bridge_report(options: DMCBridgeOptions, stats: Dict[str, Dict[str, int]], rows: int) -> str:
     """Build a small Markdown audit report for DMC bridge backfill."""
     lines = [
@@ -205,6 +256,12 @@ def build_dmc_bridge_report(options: DMCBridgeOptions, stats: Dict[str, Dict[str
         )
     lines.extend([
         "",
+        "## Audit Columns",
+        "",
+        f"- `dmc_label_source`: `{DMC_LABEL_SOURCE}`",
+        f"- `dmc_label_version`: `{DMC_LABEL_VERSION}`",
+        "- `dmc_label_confidence`: JSON map per row (direct/derived/none per field)",
+        "",
         "## Scope",
         "",
         "- Uses DMC local backtest enrichers for session/regime/structure/volatility labels.",
@@ -226,7 +283,7 @@ def _import_dmc_modules(dmc_root: str) -> dict[str, Any]:
         raise FileNotFoundError(f"DMC root not found: {dmc_root}")
 
     removed = {}
-    for name in ["trade_engine.trade_log", "trade_engine.engine", "trade_engine"]:
+    for name in ["trade_engine.trade_log", "trade_engine.engine", "trade_engine", "strategies"]:
         if name in sys.modules:
             removed[name] = sys.modules.pop(name)
 
@@ -234,6 +291,12 @@ def _import_dmc_modules(dmc_root: str) -> dict[str, Any]:
         package = types.ModuleType("trade_engine")
         package.__path__ = [os.path.join(dmc_root, "trade_engine")]
         sys.modules["trade_engine"] = package
+
+        # Register strategies module (needed by trade_log → indicators import)
+        strategies = types.ModuleType("strategies")
+        strategies.__path__ = [os.path.join(dmc_root, "strategies")]
+        sys.modules["strategies"] = strategies
+
         engine = _load_dmc_module(
             "trade_engine.engine",
             os.path.join(dmc_root, "trade_engine", "engine.py"),

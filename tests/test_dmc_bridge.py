@@ -1,3 +1,4 @@
+import json
 import os
 import textwrap
 
@@ -6,6 +7,7 @@ import pytest
 
 from strategy_enable_system.dmc_bridge import (
     DMCBridgeOptions,
+    DMC_FIELDS,
     backfill_with_dmc,
     parse_symbol_4h_paths,
 )
@@ -156,3 +158,58 @@ def test_parse_symbol_4h_paths():
 def test_parse_symbol_4h_paths_rejects_invalid_value():
     with pytest.raises(ValueError, match="Invalid --symbol-4h-path"):
         parse_symbol_4h_paths(["bad-value"])
+
+
+def test_dmc_bridge_writes_audit_columns(tmp_path):
+    """Verify dmc_label_confidence, dmc_label_source, dmc_label_version are added."""
+    dmc_root = _make_fake_dmc(tmp_path)
+    input_path = _make_input_csv(tmp_path)
+    output_path = tmp_path / "dmc_labeled.csv"
+
+    result = backfill_with_dmc(DMCBridgeOptions(
+        input_path=str(input_path),
+        output_path=str(output_path),
+        dmc_root=str(dmc_root),
+    ))
+
+    # Audit columns exist
+    assert "dmc_label_source" in result.columns
+    assert "dmc_label_version" in result.columns
+    assert "dmc_label_confidence" in result.columns
+
+    # Source and version are constant
+    assert result.loc[0, "dmc_label_source"] == "dmc_bridge_v1"
+    assert result.loc[0, "dmc_label_version"] == "1.0"
+
+    # Confidence is valid JSON
+    confidence = json.loads(result.loc[0, "dmc_label_confidence"])
+    assert isinstance(confidence, dict)
+    assert set(confidence.keys()) == set(DMC_FIELDS)
+    for field_name in DMC_FIELDS:
+        assert confidence[field_name] in ("direct", "derived", "none")
+
+    # structure_state == regime in fake DMC → derived
+    # (fake StructureStateEnricher returns regime value from _regime_cache)
+    assert confidence["structure_state"] == "derived"
+    assert confidence["session"] == "direct"
+    assert confidence["regime"] == "direct"
+
+
+def test_dmc_bridge_confidence_none_for_missing_fields(tmp_path):
+    """When a field is missing after enrichment, confidence should be 'none'."""
+    dmc_root = _make_fake_dmc(tmp_path)
+    input_path = _make_input_csv(tmp_path)
+    # Make input have no session/regime columns (use only partial fields)
+    output_path = tmp_path / "dmc_labeled.csv"
+
+    result = backfill_with_dmc(DMCBridgeOptions(
+        input_path=str(input_path),
+        output_path=str(output_path),
+        dmc_root=str(dmc_root),
+        fields=["session", "regime"],  # only backfill these two
+    ))
+
+    confidence = json.loads(result.loc[0, "dmc_label_confidence"])
+    assert set(confidence.keys()) == {"session", "regime"}
+    assert confidence["session"] == "direct"
+    assert confidence["regime"] == "direct"

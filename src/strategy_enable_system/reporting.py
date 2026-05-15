@@ -155,6 +155,8 @@ def _write_run_metadata(
             "monte_carlo_results": "monte_carlo_results.csv",
             "enable_scores": "enable_score.csv",
             "summary_report": "summary_report.md",
+            "recommendations_csv": "recommendations.csv",
+            "recommendations_md": "recommendations.md",
         },
         "sss_version": "v1.1",
     }

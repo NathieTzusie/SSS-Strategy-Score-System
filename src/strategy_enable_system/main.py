@@ -127,6 +127,8 @@ def main():
                 "performance_matrix": os.path.join(report_dir, "performance_matrix.csv"),
                 "enable_scores": os.path.join(report_dir, "enable_score.csv"),
                 "monte_carlo_results": os.path.join(report_dir, "monte_carlo_results.csv"),
+                "recommendations_csv": os.path.join(report_dir, "recommendations.csv") if os.path.exists(os.path.join(report_dir, "recommendations.csv")) else None,
+                "recommendations_md": os.path.join(report_dir, "recommendations.md") if os.path.exists(os.path.join(report_dir, "recommendations.md")) else None,
                 "run_metadata": os.path.join(report_dir, "run_metadata.yaml") if config.report_output.run_mode != "legacy" else None,
             },
             "total_trades": len(trades),

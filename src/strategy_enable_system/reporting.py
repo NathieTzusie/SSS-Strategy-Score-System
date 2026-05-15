@@ -4,13 +4,131 @@ Outputs CSV files and Markdown summary report with regime snapshot,
 layered regime, edge concentration detail, and risk category analysis.
 """
 
+import hashlib
 import os
+import re
+import yaml
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from .config import SSSConfig
+from .utils import to_csv_utf8sig
+
+
+def resolve_run_dir(
+    output_dir: str,
+    trades: pd.DataFrame,
+    run_name: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Resolve the run output directory path.
+
+    Generates: {output_dir}/{YYYY-MM-DD}/{run_slug}/
+
+    run_slug defaults to:
+      {symbol}__{strategy_names_joined_by_plus}
+    derived from unique values in the trades DataFrame.
+
+    If the slug is too long (>80 chars), it's truncated with a hash suffix.
+    If the target directory already exists, a time suffix is appended
+    (HHMMSS) to prevent overwriting.
+
+    Args:
+        output_dir: Base output directory from config.
+        trades: Trades DataFrame (used to auto-derive run_slug).
+        run_name: Optional override for run_slug.
+        overwrite: If True, allow reusing an existing directory.
+
+    Returns:
+        str: Resolved run output directory path.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    if run_name:
+        slug = _sanitize_slug(run_name)
+    else:
+        slug = _auto_run_slug(trades)
+
+    # Truncate long slugs with hash
+    if len(slug) > 80:
+        hash_suffix = hashlib.sha256(slug.encode()).hexdigest()[:6]
+        slug = slug[:73] + "__" + hash_suffix
+
+    run_dir = os.path.join(output_dir, today, slug)
+
+    # Handle existing directory
+    if os.path.exists(run_dir) and not overwrite:
+        time_suffix = datetime.now().strftime("%H%M%S")
+        run_dir = os.path.join(output_dir, today, f"{slug}__{time_suffix}")
+
+    return run_dir
+
+
+def _auto_run_slug(trades: pd.DataFrame) -> str:
+    """Derive a run_slug from the trades DataFrame."""
+    symbol = "unknown"
+    if "symbol" in trades.columns:
+        symbols = sorted(trades["symbol"].dropna().unique())
+        symbol = "+".join(str(s).upper() for s in symbols) if symbols else "unknown"
+
+    strategies = ""
+    if "strategy_name" in trades.columns:
+        strategy_names = sorted(trades["strategy_name"].dropna().unique())
+        if strategy_names:
+            strategies = "+".join(_shorten_strategy(s) for s in strategy_names)
+
+    if strategies:
+        return f"{symbol}__{strategies}"
+    return symbol
+
+
+def _shorten_strategy(name: str) -> str:
+    """Shorten common strategy name patterns for the slug.
+    
+    Examples:
+      BTP_ETH_30m → btp_eth_30m
+      BAW_ETH_5m  → baw_eth_5m
+      ATR_ETH_3m  → atr_eth_3m
+    """
+    return name.lower().replace(" ", "_").replace("-", "_")
+
+
+def _sanitize_slug(name: str) -> str:
+    """Sanitize a user-supplied run name into a safe directory slug."""
+    slug = name.strip().lower().replace(" ", "_").replace("-", "_")
+    slug = re.sub(r"[^a-z0-9_+]", "", slug)
+    slug = re.sub(r"_+", "_", slug)
+    return slug.strip("_")
+
+
+def _write_run_metadata(run_dir: str, trades: pd.DataFrame, config: SSSConfig):
+    """Write run_metadata.yaml to the run directory."""
+    strategies = (
+        sorted(trades["strategy_name"].dropna().unique().tolist())
+        if "strategy_name" in trades.columns
+        else []
+    )
+    symbols = (
+        sorted(trades["symbol"].dropna().unique().tolist())
+        if "symbol" in trades.columns
+        else []
+    )
+
+    metadata = {
+        "config_path": getattr(config, "_config_path", "unknown"),
+        "input_files": list(config.input_path),
+        "strategies": strategies,
+        "symbols": symbols,
+        "trade_count": len(trades),
+        "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "sss_version": "v1.1",
+    }
+
+    meta_path = os.path.join(run_dir, "run_metadata.yaml")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        yaml.dump(metadata, f, default_flow_style=False, allow_unicode=True)
 
 
 def generate_report(
@@ -21,34 +139,50 @@ def generate_report(
     config: SSSConfig,
 ) -> str:
     """Generate all output files: CSVs and Markdown summary.
-    
+
     Args:
         performance_matrix: Regime performance matrix.
         monte_carlo_results: Monte Carlo results.
         enable_scores: Enable score results.
         trades: Original standardized trades DataFrame (for distribution stats).
         config: SSSConfig object.
-    
+
     Returns:
         str: Path to the generated summary_report.md.
     """
-    os.makedirs(config.output_dir, exist_ok=True)
-    
+    ro = config.report_output
+
+    if ro.run_mode == "legacy":
+        out_dir = config.output_dir
+    else:
+        out_dir = resolve_run_dir(
+            output_dir=config.output_dir,
+            trades=trades,
+            run_name=ro.run_name,
+            overwrite=ro.overwrite,
+        )
+
+    os.makedirs(out_dir, exist_ok=True)
+
     # Write CSVs
-    pm_path = os.path.join(config.output_dir, "performance_matrix.csv")
-    mc_path = os.path.join(config.output_dir, "monte_carlo_results.csv")
-    es_path = os.path.join(config.output_dir, "enable_score.csv")
-    
-    performance_matrix.to_csv(pm_path, index=False)
-    monte_carlo_results.to_csv(mc_path, index=False)
-    enable_scores.to_csv(es_path, index=False)
-    
+    pm_path = os.path.join(out_dir, "performance_matrix.csv")
+    mc_path = os.path.join(out_dir, "monte_carlo_results.csv")
+    es_path = os.path.join(out_dir, "enable_score.csv")
+
+    to_csv_utf8sig(performance_matrix, pm_path)
+    to_csv_utf8sig(monte_carlo_results, mc_path)
+    to_csv_utf8sig(enable_scores, es_path)
+
+    # Write run metadata (only in non-legacy mode)
+    if ro.run_mode != "legacy":
+        _write_run_metadata(out_dir, trades, config)
+
     # Generate Markdown summary
     md_content = _build_markdown_summary(performance_matrix, monte_carlo_results, enable_scores, trades, config)
-    md_path = os.path.join(config.output_dir, "summary_report.md")
+    md_path = os.path.join(out_dir, "summary_report.md")
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md_content)
-    
+
     return md_path
 
 

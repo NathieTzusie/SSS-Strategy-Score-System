@@ -310,11 +310,25 @@ class DataQualityMonitorConfig:
 
 
 @dataclass
+class ReportOutputConfig:
+    """Controls how report output directories are organized.
+    
+    run_mode:
+      "timestamped" — create {output_dir}/{YYYY-MM-DD}/{run_slug}/ each run
+      "legacy"     — write directly to {output_dir}/ (overwrites)
+    """
+    run_mode: str = "timestamped"
+    run_name: Optional[str] = None   # Override auto-generated run_slug
+    overwrite: bool = False          # Allow overwriting an existing run dir
+
+
+@dataclass
 class SSSConfig:
     input_path: List[str] = field(default_factory=list)
     output_dir: str = "outputs"
     min_trades: int = 30
     recent_trade_window: int = 20
+    report_output: ReportOutputConfig = field(default_factory=ReportOutputConfig)
     monte_carlo: MonteCarloConfig = field(default_factory=MonteCarloConfig)
     market_opportunity: MarketOpportunityConfig = field(default_factory=MarketOpportunityConfig)
     edge_concentration: EdgeConcentrationConfig = field(default_factory=EdgeConcentrationConfig)

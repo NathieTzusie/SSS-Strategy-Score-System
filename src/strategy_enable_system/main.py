@@ -34,11 +34,48 @@ def main():
         default="config.yaml",
         help="Path to config.yaml (default: config.yaml)",
     )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Override auto-generated run directory name (slug).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Override output_dir from config.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow overwriting an existing run directory.",
+    )
+    parser.add_argument(
+        "--legacy-output",
+        action="store_true",
+        help="Use legacy output mode (write directly to output_dir, no subdirectories).",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output machine-readable JSON at the end.",
+    )
     args = parser.parse_args()
 
     config_path = args.config
     logger.info(f"Loading config from {config_path}")
     config = load_config(config_path)
+    # Store config path for metadata (non-invasive)
+    config._config_path = os.path.abspath(config_path)
+
+    # Apply CLI overrides
+    if args.output_dir:
+        config.output_dir = args.output_dir
+    if args.run_name is not None:
+        config.report_output.run_name = args.run_name
+    if args.overwrite:
+        config.report_output.overwrite = True
+    if args.legacy_output:
+        config.report_output.run_mode = "legacy"
 
     logger.info("Loading trades...")
     trades = load_trades(config)
@@ -58,18 +95,33 @@ def main():
 
     logger.info("Generating reports...")
     md_path = generate_report(pm, mc, scores, trades, config)
+    report_dir = os.path.dirname(md_path)
 
     logger.info(f"Done! Report: {md_path}")
-    logger.info("Output files:")
-    for fname in ["performance_matrix.csv", "monte_carlo_results.csv", "enable_score.csv", "summary_report.md"]:
-        logger.info(f"  - {config.output_dir}/{fname}")
 
     # Quick summary
+    status_counts = {}
     if "status" in scores.columns:
-        status_counts = scores["status"].value_counts()
+        status_counts = scores["status"].value_counts().to_dict()
         logger.info("Status breakdown:")
         for status_name in ["强开启", "中等开启", "弱开启", "禁用"]:
             logger.info(f"  {status_name}: {status_counts.get(status_name, 0)}")
+
+    # JSON mode output
+    if args.json:
+        import json
+        json_out = {
+            "status": "ok",
+            "report_dir": report_dir,
+            "summary_report": md_path,
+            "performance_matrix": os.path.join(report_dir, "performance_matrix.csv"),
+            "monte_carlo_results": os.path.join(report_dir, "monte_carlo_results.csv"),
+            "enable_score": os.path.join(report_dir, "enable_score.csv"),
+            "total_trades": len(trades),
+            "strategy_count": trades["strategy_name"].nunique() if "strategy_name" in trades.columns else 0,
+            "status_counts": status_counts,
+        }
+        print(json.dumps(json_out, ensure_ascii=False))
 
 
 if __name__ == "__main__":

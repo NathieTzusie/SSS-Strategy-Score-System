@@ -2,7 +2,7 @@
 
 策略质量评估系统 — 判断已存在策略在当前市场环境下是否应开启（强/中/弱/禁用）。
 
-**当前版本：** v1.1.0 Stable ✅ | **测试：** 230/230 | **Baseline：** 0/3/3/6 (delta=0)
+**当前版本：** v1.2.0 ✅ | **测试：** 227/227 | **Baseline：** 0/2/1/6
 
 ## 快速开始
 
@@ -10,6 +10,33 @@
 cd SSS-Strategy-Score-System
 pip install -r requirements.txt
 PYTHONPATH=src python3 -m strategy_enable_system.main --config config.yaml
+```
+
+### 新增 CLI 参数 (v1.2)
+
+| 参数 | 作用 |
+|------|------|
+| `--run-name STR` | 覆盖自动生成的 run 目录 slug |
+| `--output-dir DIR` | 覆盖 config.output_dir |
+| `--overwrite` | 允许覆盖已有 run 目录 |
+| `--legacy-output` | 使用旧行为（直接写 output_dir，不创建子目录） |
+| `--json` | 输出机器可解析 JSON（供 DMC 集成使用） |
+
+### 报告目录结构 (v1.2)
+
+每次运行自动创建独立目录，历史报告不会覆盖：
+
+```
+{output_dir}/
+  2026-05-15/
+    ETHUSDT__btp_eth_30m+baw_eth_5m+atr_eth_3m/
+      performance_matrix.csv
+      monte_carlo_results.csv
+      enable_score.csv
+      summary_report.md
+      recommendations.csv       ← v1.2 新增
+      recommendations.md        ← v1.2 新增
+      run_metadata.yaml         ← v1.2 新增
 ```
 
 ## 运行测试
@@ -213,10 +240,36 @@ data/tradingview_converted_conversion_report.md
 
 | 文件 | 说明 |
 |------|------|
-| `outputs/performance_matrix.csv` | Regime 表现矩阵（14 项核心指标 + Edge Concentration） |
-| `outputs/monte_carlo_results.csv` | Monte Carlo 风险验证（10 项 MC 指标） |
-| `outputs/enable_score.csv` | 策略开启分数（4 子分数 + 4 惩罚乘数 + 解释字段） |
-| `outputs/summary_report.md` | Markdown 汇总报告（含风险分类诊断） |
+| `performance_matrix.csv` | Regime 表现矩阵（14 项核心指标 + Edge Concentration） |
+| `monte_carlo_results.csv` | Monte Carlo 风险验证（10 项 MC 指标） |
+| `enable_score.csv` | 策略开启分数（4 子分数 + 4 惩罚乘数 + 解释字段） |
+| `summary_report.md` | Markdown 汇总报告（含风险分类诊断 + 改进建议） |
+| `recommendations.csv` | 数据驱动改进建议表 (v1.2) |
+| `recommendations.md` | 改进建议完整 Markdown (v1.2) |
+| `run_metadata.yaml` | 运行元数据（config/input/strategy list）(v1.2) |
+
+## 数据驱动改进建议 (v1.2)
+
+`recommendations.py` 从四层维度分析策略表现，自动生成可操作建议：
+
+| 维度 | Group By | 用途 |
+|------|----------|------|
+| strategy | `strategy_name` | 策略级健康度 |
+| strategy × regime | `strategy_name + regime` | regime 下表现 |
+| strategy × direction | `strategy_name + direction` | 方向偏好 |
+| strategy × regime × direction | 全部三项 | 最细粒度 |
+
+**五类建议：**
+
+| 类别 | 触发条件 | 示例 |
+|------|---------|------|
+| ⛔ Disable | PF < 1.0 + DD ≥ 5R + 样本足 | 「禁用 BAW_ETH_5m @ trend_up」 |
+| ⬇️ Downweight | PF 1.0~1.2 + 样本足 | 「降低 range 行情下仓位」 |
+| 🔧 Optimize:Entries | WR < 45% 但 payoff ≥ 0.8 | 「优化入场过滤条件」 |
+| 🔧 Optimize:Exits | WR ≥ 50% 但 payoff < 0.8 | 「优化止盈止损」 |
+| 👀 Monitor | 样本不足但 ES 有风险 | 「持续观察低样本区域」 |
+
+**可配置阈值：** 在 `config.yaml` 的 `recommendations:` 块修改。
 
 ## 评分机制
 
@@ -355,25 +408,71 @@ PYTHONPATH=src python3 -m strategy_enable_system.data_quality_monitor \
 ```
 SSS-Strategy-Score-System/
   config.yaml
+  config_dmc.yaml              ← DMC 对接专用配置
   data/sample_trades.csv
   src/strategy_enable_system/
-    main.py           # CLI 入口
-    config.py         # 配置加载与校验
-    data_loader.py    # CSV 读取与数据标准化
-    metrics.py        # Regime Performance Matrix + Edge Concentration
-    monte_carlo.py    # Bootstrap/Shuffle Monte Carlo 模拟
-    scoring.py        # Strategy Enable Score 计算
-    reporting.py      # CSV + Markdown 报告生成
-    context_report.py # Partial Context Report (P2-14)
-    schemas.py        # 字段定义
-    utils.py          # 工具函数（Gini, drawdown, 连亏等）
+    main.py                    # CLI 入口（v1.2: --run-name/--json/--legacy-output）
+    config.py                  # 配置加载与校验
+    data_loader.py             # CSV 读取与数据标准化
+    metrics.py                 # Regime Performance Matrix + Edge Concentration
+    monte_carlo.py             # Bootstrap/Shuffle Monte Carlo 模拟
+    scoring.py                 # Strategy Enable Score 计算
+    reporting.py               # CSV + Markdown 报告生成 + run dir resolver
+    recommendations.py         # 数据驱动改进建议引擎 (v1.2)
+    dmc_bridge.py              # DMC 标签回填 connector
+    context_report.py          # Partial Context Report (P2-14)
+    schemas.py                 # 字段定义
+    utils.py                   # 工具函数（Gini, drawdown, 连亏等）
   tests/
   outputs/
 ```
 
+## DMC ↔ SSS 集成 (v1.2)
+
+DMC 回测引擎可通过 `--evaluate` 参数自动触发 SSS 评分。
+
+### DMC 侧用法
+
+```bash
+# 只回测（默认）
+cd DMC-Sisie-Quantive
+python3 run_combined_backtest.py
+
+# 回测 + SSS 自动评分
+python3 run_combined_backtest.py --evaluate --sss-root ../SSS-Strategy-Score-System
+```
+
+### DMC 侧参数
+
+| 参数 | 作用 |
+|------|------|
+| `--evaluate` | 回测完成后自动调用 SSS 评分 |
+| `--sss-root DIR` | SSS 项目根目录 |
+| `--sss-run-name STR` | SSS run name override |
+| `--sss-output-dir DIR` | SSS 报告输出目录 |
+| `--sss-timeout SEC` | SSS 调用超时（默认 300s） |
+
+### SSS 侧被调用方式
+
+DMC 自动生成 bridge config → 调用 SSS CLI `--json` → 解析 report_dir。
+SSS 的 `--json` 输出稳定 schema 供 DMC 机器解析。
+
+### DMC 侧输出
+
+```
+reports/sss_evaluation/
+  2026-05-15/ETHUSDT__dmc_combined/
+    summary_report.md
+    recommendations.csv
+    recommendations.md
+    run_metadata.yaml
+    enable_score.csv
+    ...
+```
+
 ## 版本
 
-v1.1.0 Stable — P0 + P1 + P2-1 至 P2-20 完成。Market Opportunity Score / Classifier 为 BLOCK（orderflow 覆盖不足）。
+v1.2.0 — P0 + P1 + P2 全系列 + Phase 1/2/3（独立输出目录、改进建议、DMC 集成）。Market Opportunity Score / Classifier 为 BLOCK（orderflow 覆盖不足）。
 
 ## 推荐日常运行
 
